@@ -1,0 +1,179 @@
+# LLM-Assisted Project Decision Checklist
+
+> Status: Living planning checklist
+> Last updated: 2026-10-05
+
+Use this file as a reminder of the major decisions required to build Kirim with human and AI/LLM contributors.
+
+## Rules for Humans and Agents
+
+- This checklist tracks progress; it is not the authority for accepted decisions.
+- `DECISIONS.md` is the durable source of accepted decisions and rationale.
+- `docs/REQUIREMENTS.md` defines product behavior and constraints.
+- `docs/TECH_STACK.md` summarizes selected architecture, technologies, and standards.
+- Never mark a decision complete until the Product Owner explicitly approves it and the decision is recorded in the appropriate source-of-truth files.
+- Do not infer a provider, framework, library, version, contract, or product behavior from an unchecked item.
+- Verify current versions and provider capabilities using official documentation, sandbox tests, and applicable contractual/legal review before selection.
+- When a decision is revisited, update or supersede its record; do not silently rewrite history.
+
+## A. Architecture Overview — Complete
+
+- [x] **DEC-001:** Modular monolith architecture.
+- [x] **DEC-002:** One Flutter user app and separate minimal Admin web console.
+- [x] **DEC-003:** API process, durable Worker, and nine domain modules.
+- [x] **DEC-004:** Managed commodity infrastructure with Kirim-owned domain logic.
+- [x] **DEC-005:** Managed application platform deployment model.
+
+## B. Primary Technology Stack — Complete So Far
+
+- [x] **DEC-006:** Flutter/Dart mobile client with Android-first release.
+- [x] **DEC-007:** React/TypeScript Admin SPA.
+- [x] **DEC-008:** Python/FastAPI backend.
+- [x] **DEC-009:** PostgreSQL/PostGIS authoritative database.
+- [x] **DEC-010:** PostgreSQL-backed durable jobs and no initial shared cache.
+
+## C. Backend and API Decisions
+
+- [x] **DEC-018:** Pragmatic REST-style JSON API with OpenAPI and explicit action subresources.
+- [x] **DEC-019:** `/api/v1`, RFC 9457 errors, cursor pagination, allowlisted filters/sorts, idempotency keys, and optimistic/domain concurrency controls.
+- [x] **DEC-020:** CPython 3.14 runtime line; compatibility-test and lock exact FastAPI/Pydantic/Starlette/ASGI dependency set at scaffolding.
+- [ ] Python package and dependency-management tool.
+- [ ] PostgreSQL driver and synchronous/asynchronous access model.
+- [ ] ORM/query approach.
+- [ ] Database migration tool.
+- [ ] Connection-pooling strategy.
+- [ ] PostgreSQL job implementation or library.
+- [ ] Retry, backoff, timeout, leasing, and permanent-failure policy.
+- [ ] File-upload and evidence-processing architecture.
+- [ ] In-app messaging delivery approach.
+- [ ] PostGIS coordinate system, geometry model, and distance semantics.
+
+## D. Authentication and Authorization
+
+- [x] **DEC-011:** Managed authentication proof with Kirim-owned accounts and authorization.
+- [x] **DEC-012:** Email/password login with mandatory email and SMS phone verification; social login deferred for MVP.
+- [x] **DEC-013:** Native OAuth Authorization Code with PKCE/OIDC, provider API access tokens, and provider-managed refresh sessions.
+- [x] **DEC-014:** Kirim server-side opaque Admin session using a Secure HttpOnly cookie.
+- [x] **DEC-014:** Mandatory TOTP MFA for Administrator/Support accounts; phishing-resistant MFA deferred for evaluation.
+- [x] **DEC-012:** One-time SMS code for phone verification; provider remains undecided.
+- [x] **DEC-015:** Provider-managed email verification and email-only password-reset links with controlled contact changes.
+- [x] **DEC-016:** Deny-by-default hybrid module-owned authorization policies.
+- [x] **DEC-017:** Provider revocation plus Kirim security version/status and compromised-account hold.
+
+## E. Flutter Mobile Decisions
+
+- [ ] Flutter and Dart versions.
+- [ ] Supported Android OS versions and device baseline.
+- [ ] Flutter application architecture.
+- [ ] State-management approach.
+- [ ] Navigation and deep-link approach.
+- [ ] API client and OpenAPI model-generation approach.
+- [ ] Secure token/credential storage.
+- [ ] Local persistence and offline behavior.
+- [ ] Maps and route-display integration.
+- [ ] Location and background-location implementation.
+- [ ] Camera, receipt, and evidence-upload implementation.
+- [ ] Push-notification integration.
+- [ ] Localization implementation.
+- [ ] Accessibility and mobile design conventions.
+- [ ] Flutter test tooling.
+- [ ] Android signing and controlled distribution.
+
+## F. React Admin Console Decisions
+
+- [ ] React and TypeScript versions.
+- [ ] Build tool.
+- [ ] Routing approach.
+- [ ] API data-fetching and cache approach.
+- [ ] Forms and runtime validation.
+- [ ] UI/component approach.
+- [ ] Admin authentication and browser-session security.
+- [ ] React testing tools.
+- [ ] Admin build and deployment process.
+
+## G. External Providers
+
+- [ ] Payment provider.
+- [ ] Payment webhook, reconciliation, refund, and payout integration.
+- [ ] Maps/geocoding/routing provider.
+- [ ] Android push-notification provider/configuration.
+- [ ] SMS-delivery provider.
+- [ ] Email-delivery provider.
+- [ ] Private object-storage provider.
+- [ ] File malware/content-safety approach.
+- [ ] Managed application hosting provider.
+- [ ] Hosting region and data-location policy.
+- [ ] Managed PostgreSQL/PostGIS provider.
+- [ ] Secrets-management provider.
+- [ ] Logging, metrics, error-reporting, and alerting provider.
+
+## H. Testing and Engineering Standards
+
+- [ ] Backend unit, integration, contract, and end-to-end test tools.
+- [ ] Real PostgreSQL/PostGIS test-environment approach.
+- [ ] Payment-provider sandbox and fake-provider testing strategy.
+- [ ] Formatting and linting tools.
+- [ ] Strict Python and TypeScript type-checking tools.
+- [ ] Coverage and critical-path testing policy.
+- [ ] Security and dependency-scanning tools.
+- [ ] API compatibility/breaking-change checks.
+- [ ] Branch and commit conventions.
+- [ ] Dependency-update policy.
+
+## I. Repository and Delivery
+
+- [ ] Monorepo or multiple repositories.
+- [ ] Final repository/package structure.
+- [ ] Local development environment.
+- [ ] Configuration and environment-variable conventions.
+- [ ] CI provider and quality gates.
+- [ ] Deployment workflow.
+- [ ] Database migration release process.
+- [ ] Rollback and forward-recovery strategy.
+- [ ] Staging-data and synthetic-fixture policy.
+- [ ] Backup and restore implementation.
+- [ ] Incident and pilot-pause implementation.
+
+## J. Design Decisions After `TECH_STACK.md`
+
+- [ ] Database entities, ownership, constraints, indexes, and retention.
+- [ ] Complete transaction state machine.
+- [ ] Financial ledger and reconciliation model.
+- [ ] API resources, request/response schemas, and error codes.
+- [ ] Evidence/file metadata and access model.
+- [ ] Geofence and route-geometry schema.
+- [ ] Audit-event structure.
+- [ ] Payment-provider contract mapping.
+- [ ] Deployment and support runbooks.
+
+## Decision Timing
+
+### Before Initial Scaffolding
+
+- Authentication direction.
+- API style.
+- Backend data-access and migration tools.
+- Repository structure.
+- Core versions and package managers.
+- Initial testing and quality tools.
+
+### Before Implementing the Relevant Feature
+
+- Maps and location.
+- Files and evidence.
+- Messaging and notifications.
+- Payment provider and payment contracts.
+
+### Before Stage B Real-User Pilot
+
+- Production hosting and provider details.
+- Real payment-provider contract and sandbox proof.
+- Production SMS/email configuration.
+- Backup and restoration proof.
+- Security, privacy, support, and operational launch gates.
+
+## Current Progress
+
+- Major accepted decision records: **20**.
+- Remaining planning decisions: approximately **38**, depending on how supporting tools are grouped.
+- Current next topic: **Python package and dependency-management tool**.
