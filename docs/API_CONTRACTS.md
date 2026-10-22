@@ -58,6 +58,16 @@ The example hostname and resource paths are placeholders, not approved endpoint 
 - Retry guidance: Retry only documented safe/idempotent operations and preserve the same idempotency key for the same intended operation.
 - Concurrency control: Strong ETag/`If-Match` for eligible editable resources; transactional state checks, locking/versioning, uniqueness, and constraints for workflow actions. Use `412` for failed explicit preconditions and `409` for current domain-state conflicts.
 
+### Evidence File Transfer
+
+- Upload and download bytes through authenticated, currently authorized backend endpoints; clients do not connect directly to production object storage (`DECISIONS.md`, DEC-026).
+- Upload operations are idempotent and use bounded streaming multipart requests; exact endpoint names, field names, limits, formats, and timeout/retry rules remain TBD.
+- The backend controls object keys and evidence purpose. Filenames and client media types are untrusted metadata.
+- Upload responses expose processing state rather than imply immediate acceptance; unvalidated evidence cannot satisfy a workflow requirement.
+- Download operations reauthorize current relationship/case assignment and return safe media/disposition/sniffing headers. Storage keys are never authorization capabilities.
+- Support/Admin evidence reads are case-scoped and audited.
+- OpenAPI contracts describe metadata/state operations; binary streaming behavior and client cancellation/retry tests must also be documented explicitly.
+
 ## 3. REST Operation Template
 
 ### `[METHOD] /resource`

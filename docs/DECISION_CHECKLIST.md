@@ -42,9 +42,9 @@ Use this file as a reminder of the major decisions required to build Kirim with 
 - [x] **DEC-022:** SQLAlchemy 2 hybrid with typed ORM mappings and explicit Core/parameterized SQL where appropriate.
 - [x] **DEC-023:** Alembic with reviewed committed migrations, controlled release execution, and forward-safe PostgreSQL/PostGIS policy.
 - [x] **DEC-024:** Small explicitly bounded SQLAlchemy `QueuePool` per long-running process; exact global connection budget deferred to deployment selection.
-- [ ] PostgreSQL job implementation or library.
-- [ ] Retry, backoff, timeout, leasing, and permanent-failure policy.
-- [ ] File-upload and evidence-processing architecture.
+- [ ] PostgreSQL job implementation or library — intentionally deferred to backend scaffolding; Procrastinate is the leading candidate, subject to the approved transaction, Python 3.14, Psycopg 3/SQLAlchemy 2, crash-recovery, and connection-budget spike.
+- [x] **DEC-025:** Job-class-specific at-least-once handling with idempotency, bounded jittered retries, short leases, reconciliation, and visible permanent failure.
+- [x] **DEC-026:** Backend-streamed evidence transfer to private object storage with quarantine processing, immutable originals, controlled derivatives, and audited access.
 - [ ] In-app messaging delivery approach.
 - [ ] PostGIS coordinate system, geometry model, and distance semantics.
 
@@ -174,6 +174,6 @@ Use this file as a reminder of the major decisions required to build Kirim with 
 
 ## Current Progress
 
-- Major accepted decision records: **24**.
-- Remaining planning decisions: approximately **34**, depending on how supporting tools are grouped.
-- Current next topic: **PostgreSQL durable-job implementation or library**.
+- Major accepted decision records: **26**.
+- Remaining planning decisions: approximately **32**, depending on how supporting tools are grouped.
+- Current next topic: **in-app messaging delivery approach**.

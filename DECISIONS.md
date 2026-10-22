@@ -2207,3 +2207,230 @@ Review this decision if the selected provider mandates a connection proxy; maxim
 - Managed PostgreSQL sizing
 - Migrations and administrative tooling
 - Load testing, metrics, alerts, and runbooks
+
+---
+
+## DEC-025 — 2026-10-18 — Use Job-Class-Specific Bounded Retries, Leases, and Visible Permanent Failure
+
+- **Status:** Accepted
+- **Decision owner:** Product Owner
+
+### Context
+
+Kirim's PostgreSQL-backed Worker will execute notifications, evidence processing, payment reconciliation, settlement, refunds, reimbursements, and other consequential tasks. Network failures, provider rate limits, worker crashes, and uncertain external outcomes are normal distributed-system conditions. One retry policy cannot safely cover every job class; unlimited retries can create storms or repeated effects, while no retries make ordinary transient failures operationally expensive. The behavior must remain valid regardless of which PostgreSQL job library passes the implementation spike.
+
+### Decision
+
+**Delivery and handler contract**
+
+- Use **at-least-once delivery**. Never claim exactly-once execution.
+- Every handler must be idempotent and must define its idempotency/deduplication scope, supported payload version, retry classification, attempt/deadline policy, and observability severity.
+- Consequential external operations use stable Kirim idempotency identifiers and provider idempotency mechanisms where supported, plus reconciliation where outcomes can be uncertain.
+- Version durable job payloads and reject/route unsupported versions safely rather than guessing their meaning.
+
+**Failure classification**
+
+Each job handler classifies failures into documented categories:
+
+- **Transient:** temporary network/database availability, bounded timeout, provider `5xx`, or another explicitly recoverable condition.
+- **Rate limited:** retry according to a validated provider delay such as `Retry-After`, bounded by Kirim's policy.
+- **Permanent:** invalid/unsupported payload, non-recoverable provider rejection, revoked/no-longer-applicable operation, impossible domain transition, or another documented non-retryable condition.
+- **Unknown external outcome:** the provider might have accepted a consequential operation but Kirim lacks a definitive response. Enter provider-status reconciliation; do not blindly repeat the effect.
+
+Do not treat every exception or HTTP `4xx`/`5xx` uniformly. Each adapter maps documented provider behavior conservatively, and unexpected errors receive a bounded policy plus visibility.
+
+**Retries and backoff**
+
+- Use bounded exponential backoff with jitter for ordinary transient failures to avoid synchronized retry storms.
+- Configure maximum attempts, initial delay, multiplier, maximum delay, age/deadline, and retryable classifications by job class.
+- Use **five total attempts as an initial ordinary-job default**, subject to implementation/load/provider testing; this is not the policy for every job.
+- Financial reconciliation and scheduled obligations may have longer-lived schedules but still require escalation and operator visibility rather than invisible infinite retries.
+- Successful completion, permanent failure, cancellation, supersession, and retry scheduling must be explicit persisted states/events as supported by the selected implementation.
+
+**Timeouts**
+
+- Apply bounded database lock and statement timeouts, provider connect/read/request timeouts, and an expected overall job deadline appropriate to the job class.
+- Since synchronous Python threads cannot be safely terminated arbitrarily, handlers must use bounded underlying operations and cooperative deadlines. Do not mark work as safely stopped while an untracked thread can still create effects.
+- Long-running or uninterruptible processing requires an explicit process-isolation or provider-job design review rather than relying on unsafe thread cancellation.
+
+**Claiming, leases, and crash recovery**
+
+- Claim jobs in short transactions and commit the claim before external processing; never keep a row lock or transaction open for the full execution.
+- Associate each claim with an unguessable or collision-resistant worker/lease token and lease expiry.
+- Renew leases only for job classes intentionally designed to exceed the base lease duration.
+- Verify current lease ownership/fencing before recording completion or retry state where the implementation permits it.
+- Recover expired claims after worker failure while assuming the previous attempt may have partially executed; recovery therefore relies on handler idempotency and reconciliation, not only the lease.
+- Keep the durable table/state authoritative. Notifications such as PostgreSQL `NOTIFY` may wake workers but are never the sole job payload or delivery guarantee.
+
+**Permanent failure and replay**
+
+- After policy exhaustion or a permanent classification, retain the job in a visible terminal/dead-letter state. Never silently discard it.
+- Preserve attempt timestamps, sanitized classification/error details, correlation identifiers, and result references according to retention policy. Do not persist secrets, tokens, unnecessary personal data, or uncontrolled full provider payloads in errors.
+- Alert/escalate according to severity and outstanding obligation. A failed promotional notification and an incomplete refund do not receive the same response.
+- Authorized manual replay occurs only after the cause and current domain/provider state are reviewed. Replay creates a traceable new attempt/job while preserving original history and is audited for consequential Admin actions.
+
+**Financial safeguards**
+
+- Settlement, payment, refund, reimbursement, and financial-reconciliation jobs use stable idempotency identifiers and query/reconcile authoritative provider state after uncertain responses.
+- Do not record a successful external financial/ledger transition without the required authoritative confirmation and local transactional checks.
+- Incomplete financial obligations remain visible and high-severity after automated retry exhaustion, with controlled repair paths that preserve ledger and audit history.
+
+Exact values beyond the ordinary five-attempt starting point—including delays, lease durations, timeouts, job-specific attempts, alert thresholds, and retention—must be specified per job class after provider and deployment testing. The eventual queue library must demonstrate these required semantics or document the bounded adapter/custom behavior that supplies them.
+
+### Rationale
+
+- Job-specific policies reflect different consequence, provider, and timing profiles.
+- At-least-once plus idempotency is honest about crashes and network uncertainty.
+- Bounded backoff with jitter recovers transient failures without unbounded storms.
+- Short claims plus leases permit crash recovery without holding long transactions.
+- Visible dead-letter state and audited replay protect supportability and financial obligations.
+- Reconciliation prevents a timeout from becoming an unsafe duplicate payment attempt.
+
+### Alternatives Considered
+
+- **One uniform retry policy:** Rejected because job classes have materially different risks and deadlines.
+- **Infinite automatic retries:** Rejected because poison jobs and permanent provider failures could consume resources or repeat effects indefinitely without escalation.
+- **No automatic retries:** Rejected because normal transient failures would create avoidable manual work and reduced reliability.
+- **Exactly-once execution claim:** Rejected because database commits, process crashes, and external provider effects cannot be made universally atomic.
+- **Hold a database lock/transaction during execution:** Rejected because long external work would cause contention, timeout, and recovery problems.
+- **Delete failed jobs:** Rejected because it removes evidence required for support, audit, repair, and incident analysis.
+
+### Consequences
+
+**Benefits**
+
+- Predictable, inspectable failure behavior.
+- Safe recovery from common transient faults and worker crashes.
+- Stronger duplicate-effect and uncertain-financial-outcome protection.
+- Clear operational distinction between low-impact and critical jobs.
+- Queue-library choice remains replaceable behind required semantics.
+
+**Costs and constraints**
+
+- Every job class needs explicit policy and tests.
+- Lease, idempotency, reconciliation, metrics, and replay handling add implementation work.
+- Operations need dead-letter views, alerts, and repair runbooks.
+- Five attempts is only a starting default and cannot substitute for provider-specific analysis.
+
+### Revisit Triggers
+
+Review this decision if the selected queue implementation cannot supply safe leases/recovery; measured failure patterns require adjusted policies; a provider's API changes idempotency or reconciliation guarantees; jobs become long-running/CPU-heavy; or the system adopts infrastructure with a different delivery model. Changes must preserve auditability and prevent duplicate consequential effects.
+
+### References
+
+- PostgreSQL `SKIP LOCKED` queue-like access: https://www.postgresql.org/docs/current/sql-select.html
+- PostgreSQL `NOTIFY`: https://www.postgresql.org/docs/current/sql-notify.html
+- PostgreSQL `LISTEN`: https://www.postgresql.org/docs/current/sql-listen.html
+
+### Affected Areas
+
+- `docs/TECH_STACK.md`
+- Job payload contracts and persistence schema
+- Worker handlers and provider adapters
+- Payments, ledger, settlement, refunds, and reimbursements
+- Admin/support repair and replay tooling
+- Metrics, alerts, audit, retention, and incident runbooks
+
+---
+
+## DEC-026 — 2026-10-18 — Proxy Evidence Files Through the Backend for the MVP
+
+- **Status:** Accepted
+- **Decision owner:** Product Owner
+
+### Context
+
+Kirim requires receipt, price/location, arrival, handover, dispute, safety-report, and other evidence that may contain personal, financial, location, or sensitive contextual data. Original evidence must be immutable, access-controlled, auditable, retained/deleted according to policy, and reviewable by assigned Support only. DEC-005 states that production object storage is not directly accessible from public clients. Direct signed uploads can reduce application bandwidth but introduce a separate authorization/completion lifecycle and would revise that boundary. MVP scale is limited and expected evidence files are bounded images/documents rather than large media.
+
+### Decision
+
+**Transfer architecture**
+
+- For the MVP, upload and download evidence through authenticated, authorized Kirim backend endpoints:
+  - client to API to private object storage for uploads;
+  - private object storage to API to authorized client for downloads.
+- Stream bytes with bounded buffers; never load an entire permitted file into application memory by default.
+- Keep storage containers/buckets private. Do not expose public object URLs, storage credentials, or storage object keys as authorization capabilities.
+- Do not use direct client signed-storage upload/download URLs initially. Adopting them later requires an explicit amendment to the DEC-005 public-client boundary and a dedicated threat/abuse review.
+
+**Upload lifecycle**
+
+- Require authentication, account eligibility, resource relationship/workflow authorization, allowed evidence purpose, and count/size policy before accepting an upload.
+- Use an idempotent upload operation and a random server-controlled object key unrelated to user filenames or predictable identifiers.
+- Create a pending evidence metadata record, stream the original to a private quarantine/pending location, and finalize availability only after required processing succeeds.
+- Define explicit states for pending/uploaded/processing/accepted/rejected/failed/deleted or their approved equivalent. Domain workflows must not treat unvalidated evidence as accepted.
+- Use durable jobs for validation/derivative generation/cleanup. Detect and clean abandoned metadata/objects and orphans safely without deleting held or referenced evidence.
+- Because database and object storage cannot share one atomic transaction, make every lifecycle transition idempotent and reconciliable.
+
+**Validation and safe serving**
+
+- Enforce purpose-specific maximum file count and byte size before and while streaming.
+- Allowlist supported formats. Do not trust filename extensions or client `Content-Type`; inspect signatures/magic bytes and decode supported image/document structures.
+- Reject malformed, truncated, unsupported, encrypted where unsupported, decompression-bomb, or otherwise unsafe content. Verify malware-scanning capabilities and limits before implementation; scanning does not replace format validation.
+- Never execute uploaded content or serve untrusted active content from an application origin in a way that can execute in the browser.
+- Use safe response content types, `Content-Disposition`, content-sniffing protections, authorization, and bounded streaming for downloads.
+- Exact formats, dimensions, counts, and size limits require Android-device and product-flow testing. HEIC and conversion support are not assumed.
+
+**Integrity and metadata**
+
+- Preserve every accepted original as immutable. Corrections/additions create linked records/objects and never overwrite the original.
+- Record at minimum a random object key, cryptographic hash, byte size, detected media type, evidence purpose, linked domain record, uploader, server receipt time, processing/version status, retention category, legal/dispute hold state, and derivative references.
+- Verify hashes when the storage/processing flow requires integrity checks, and record storage-provider version/integrity metadata where useful without treating provider metadata as the sole application audit record.
+- Preserve an original privately when evidentiary metadata may matter, while generating separate sanitized display derivatives where required for safe/minimized viewing.
+- Do not treat EXIF time/location as authoritative alone. Store server time, approved app-collected location, workflow context, and provenance separately and display uncertainty appropriately.
+- Do not leak sensitive original metadata through display derivatives unless an authorized case-specific use requires it.
+
+**Authorization, audit, and lifecycle**
+
+- Reauthorize every upload and download against current account, relationship, case assignment, workflow state, and evidence purpose. Possession of an identifier is never sufficient.
+- Record attributable audit events for Support/Admin evidence access and consequential evidence decisions without logging file contents or unnecessary personal data.
+- Encrypt in transit and use provider-supported encryption at rest; exact key-management requirements follow provider/security selection.
+- Apply approved retention categories, dispute/legal/fraud/account holds, user deletion/export rules, and provider deletion verification through durable lifecycle jobs.
+- Backups, replicas, derivatives, and caches must be included in retention/deletion design, with documented limitations and restoration behavior.
+
+### Rationale
+
+- Backend proxying preserves the already approved no-direct-public-storage boundary.
+- It centralizes authorization and access auditing for sensitive evidence.
+- MVP scale and bounded evidence sizes do not yet justify signed-upload lifecycle complexity.
+- Streaming controls memory usage while retaining a simple trust boundary.
+- Quarantine/processing states prevent unvalidated objects from becoming authoritative evidence.
+- Immutable originals plus sanitized derivatives balance evidentiary integrity and safe/minimized display.
+
+### Alternatives Considered
+
+- **Short-lived signed direct storage URLs:** Deferred because they would change DEC-005's public-client boundary and add upload-intent, restriction, completion, orphan, and audit complexity. Reconsider if measured bandwidth/file reliability requires it.
+- **Store binary evidence in PostgreSQL:** Rejected because it would increase primary database, backup, and restore burden and conflicts with the approved object-storage component.
+- **Public object URLs:** Rejected because evidence is private and relationship/case authorization can change over time.
+- **Trust filename or client media type:** Rejected because both are attacker-controlled and insufficient for safe processing/serving.
+- **Modify/replace originals during sanitization:** Rejected because requirements call for immutable original evidence and correction through linked records.
+
+### Consequences
+
+**Benefits**
+
+- One backend-controlled authorization and audit path.
+- Private storage remains isolated from public clients.
+- Strong evidence provenance and immutable-original handling.
+- Simpler MVP client and storage lifecycle.
+
+**Costs and constraints**
+
+- API instances carry upload/download bandwidth and connection load.
+- Streaming, cancellation, size enforcement, quarantine, orphan cleanup, and reconciliation require careful implementation and tests.
+- Large files or increased volume may eventually require signed direct transfer.
+- Processing and retention add Worker load and storage metadata.
+
+### Revisit Triggers
+
+Review this decision if measured bandwidth/cost, upload reliability, API connection duration, evidence volume/size, or hosting limits make proxying unacceptable. A signed-transfer design must retain backend-created upload intent, strict object/size/type/expiry constraints, private storage, authenticated completion, post-upload validation, orphan cleanup, download authorization/audit, and revocation/retention controls, and must explicitly amend DEC-005.
+
+### Affected Areas
+
+- `docs/TECH_STACK.md`
+- `docs/API_CONTRACTS.md`
+- `docs/DATABASE_SCHEMA.md`
+- Evidence and Files module
+- Flutter upload/download UX
+- Admin/Support evidence review
+- Object storage, Worker processing, retention/deletion, audit, and observability
