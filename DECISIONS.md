@@ -1879,3 +1879,331 @@ A runtime-minor change requires CI/production compatibility testing and a docume
 - API and Worker deployment images/configuration
 - Local development and CI
 - Security maintenance and upgrade procedures
+
+---
+
+## DEC-021 — 2026-10-18 — Use Psycopg 3 with Synchronous PostgreSQL Access Initially
+
+- **Status:** Accepted
+- **Decision owner:** Product Owner
+
+### Context
+
+Kirim's FastAPI API and durable Worker need a consistent PostgreSQL/PostGIS access model. The invite-only MVP is expected to be dominated by short transactional operations at modest concurrency. Asynchronous database access can reduce thread occupancy under high concurrent wait, but it propagates `async` through application and persistence code, adds session/cancellation complexity, and does not increase PostgreSQL's connection capacity. The chosen driver should remain current and leave a credible async migration path if measurements later justify it.
+
+### Decision
+
+- Use **Psycopg 3** as the PostgreSQL driver and use its **synchronous access model initially** for both API and Worker database operations.
+- Use one database session/connection and transaction scope per request, Worker job, or explicitly bounded unit of work. Never share a session/connection across concurrent requests, jobs, or threads.
+- Keep transactions short. Do not hold an open database transaction while calling payment, identity, messaging, notification, mapping, or object-storage providers.
+- FastAPI operations that perform synchronous database/application work must use a consistent synchronous execution path that FastAPI can offload, or explicitly offload the complete bounded synchronous unit. Never call blocking database helpers directly on an event-loop thread from `async def` code.
+- Separate transaction boundaries from transport handlers and make commit/rollback ownership explicit. Do not commit implicitly inside repositories.
+- Coordinate process/thread concurrency, database pool sizes, Worker concurrency, and the managed PostgreSQL connection limit.
+- Apply statement, lock, connection, and external-call timeouts through later operational decisions; do not rely on unlimited waits.
+- Reconsider asynchronous database access only after representative load/latency evidence identifies thread occupancy or concurrent database waiting as a material bottleneck.
+- If async access is later adopted, use one async session per task and migrate bounded modules/use cases deliberately; do not mix sync and async database operations inside one transaction.
+
+This decision selects the driver and initial I/O model only. ORM/query style, migration tooling, pooling implementation, transaction isolation, and exact dependency versions remain separate decisions.
+
+### Rationale
+
+- Synchronous transactional code is simpler to implement, review, debug, and test for a domain with payments, ledger effects, disputes, and workflow guards.
+- It naturally fits the durable Worker as well as the API, reducing duplicate persistence patterns.
+- FastAPI supports synchronous route/dependency execution through its thread-pool behavior when used correctly.
+- MVP throughput does not currently justify async database complexity.
+- Psycopg 3 is the current driver generation and supports both synchronous and asynchronous APIs, preserving a future option without selecting two drivers now.
+
+### Alternatives Considered
+
+- **Psycopg 3 asynchronous access:** Not selected initially because no measured concurrency requirement offsets the additional async transaction, cancellation, session-lifecycle, and testing complexity.
+- **`asyncpg`:** Not selected because it is async-only and Psycopg 3 already provides a supported async path if required. Kirim has no demonstrated driver-specific performance need.
+- **Psycopg 2:** Not selected because Kirim is a new project and Psycopg 3 is the current driver generation with modern sync/async support.
+- **Mixed sync API and async Worker, or the reverse:** Rejected initially because two persistence execution models would increase testing and operational complexity without a proven benefit.
+
+### Consequences
+
+**Benefits**
+
+- Straightforward transaction and unit-of-work behavior.
+- One initial persistence execution model across API and Worker.
+- Easier testing, debugging, and failure analysis.
+- Future async capability remains available through Psycopg 3.
+
+**Costs and constraints**
+
+- Blocking database work consumes a thread while waiting.
+- Route declarations and helper calls require discipline to avoid blocking the ASGI event loop.
+- Process, thread, Worker, and pool concurrency must be bounded against database limits.
+- Moving to async later requires application/repository call-chain changes despite retaining the same driver family.
+
+### Revisit Triggers
+
+Review this decision if representative load tests or production telemetry show unacceptable queueing/thread saturation attributable to database waiting; if a required library lacks adequate synchronous support; or if a future real-time workload produces a demonstrated concurrency need. Revisit only after query/index optimization, transaction-duration review, and pool/process tuning are evaluated.
+
+### References
+
+- Psycopg 3 basic usage: https://www.psycopg.org/psycopg3/docs/basic/usage.html
+- Psycopg 3 concurrent/async operations: https://www.psycopg.org/psycopg3/docs/advanced/async.html
+- FastAPI concurrency guidance: https://fastapi.tiangolo.com/async/
+
+### Affected Areas
+
+- `docs/TECH_STACK.md`
+- Persistence adapters and transaction/unit-of-work boundaries
+- FastAPI route/dependency execution style
+- Worker execution model
+- Connection pooling and deployment concurrency
+- Database integration and load tests
+
+---
+
+## DEC-022 — 2026-10-18 — Use a Pragmatic SQLAlchemy 2 ORM and Explicit-Query Hybrid
+
+- **Status:** Accepted
+- **Decision owner:** Product Owner
+
+### Context
+
+Kirim needs ordinary relational persistence alongside workflow locking, authorization-constrained reads, audit/support projections, ledger queries, and PostGIS matching. An ORM improves routine mapping and unit-of-work behavior, but forcing every spatial or performance-sensitive query through object relationships can hide SQL, cause accidental loading, and make database-specific capabilities awkward. Conversely, Core/raw-SQL-only access would add repetitive mapping for normal transactional work. API contracts must remain independent from persistence representations.
+
+### Decision
+
+- Use **SQLAlchemy 2** as the database toolkit with a pragmatic hybrid approach:
+  - typed declarative ORM mappings and sessions for ordinary persistence;
+  - SQLAlchemy Core expressions or reviewed parameterized SQL for complex PostGIS, reporting, locking, bulk, and performance-sensitive queries where they are clearer or more controllable.
+- Use SQLAlchemy 2-style `select()` and typed `Mapped[...]`/`mapped_column()` APIs; do not introduce the legacy `Query` API.
+- Keep request/response Pydantic schemas separate from ORM mappings. Never directly serialize ORM objects as public API responses.
+- Each domain module owns its mappings and persistence/query adapters. Cross-module reads use explicit application contracts or purpose-built read projections rather than arbitrary relationship traversal.
+- Do not create a generic repository/base-service abstraction. Introduce a repository or query interface only where it expresses a domain boundary, improves testing, or supports multiple implementations.
+- Make transaction/unit-of-work ownership explicit in the application layer, consistent with DEC-021. Repositories may flush but do not independently commit hidden transactions.
+- Load relationships explicitly for each use case. Configure or apply raise-on-unexpected-lazy-load behavior where practical, and test important query counts to detect N+1 regressions.
+- Apply authorization/disclosure constraints before or within data retrieval when loading unauthorized rows would create unnecessary exposure risk. Response mapping remains a second defensive boundary.
+- Use bound parameters exclusively for dynamic values. Never construct SQL using string interpolation or concatenation of untrusted values. Dynamic identifiers and sort/filter fields come only from allowlists.
+- Consider GeoAlchemy2 for PostGIS type/function integration after Python 3.14, SQLAlchemy, Psycopg, Alembic, and PostGIS compatibility verification. Its selection and exact version are implementation details unless testing reveals a consequential limitation.
+- Permit database-specific SQL where it provides correctness or clarity. Isolate it in the owning persistence adapter, document why it is database-specific, and cover it with real-PostgreSQL integration tests.
+- Profile and inspect generated SQL/query plans before replacing straightforward ORM/Core queries solely for presumed performance.
+
+This decision does not select migration tooling, schema conventions, spatial representation/SRID semantics, pooling, or exact package versions.
+
+### Rationale
+
+- SQLAlchemy provides one session, transaction, mapping, and expression ecosystem over Psycopg 3.
+- Typed ORM mappings reduce repetitive ordinary persistence code.
+- Core and parameterized SQL preserve direct use of PostgreSQL/PostGIS strengths.
+- Explicit loading and query ownership reduce hidden I/O and N+1 behavior.
+- Separating API schemas from mappings protects contracts and disclosure boundaries.
+- Avoiding a generic repository prevents abstractions that merely mirror SQLAlchemy without domain value.
+
+### Alternatives Considered
+
+- **SQLAlchemy ORM for every query:** Not selected because complex PostGIS, reporting, locking, and tuned projections may be clearer and safer as Core or explicit SQL.
+- **SQLAlchemy Core/parameterized SQL only:** Not selected because it would add mapping and persistence boilerplate for normal transactional aggregates without a demonstrated benefit.
+- **SQLModel:** Not selected because combining Pydantic and SQLAlchemy concepts provides limited value when Kirim intentionally separates transport and persistence models, and it adds another abstraction over SQLAlchemy.
+- **Direct Psycopg only:** Not selected because Kirim would need to recreate mapping, unit-of-work, expression, and migration integration patterns while still supporting many ordinary relational operations.
+- **A generic repository framework:** Rejected because it tends to obscure useful SQLAlchemy/PostgreSQL capabilities and produce lowest-common-denominator interfaces.
+
+### Consequences
+
+**Benefits**
+
+- Productive ordinary persistence plus precise complex queries.
+- One transaction and database-toolkit model across modules.
+- Explicit boundary between API contracts and stored representations.
+- Direct path to PostGIS and PostgreSQL-specific correctness/performance features.
+- Reduced pressure to prematurely abstract all persistence behavior.
+
+**Costs and constraints**
+
+- Contributors must understand SQLAlchemy ORM, Core, SQL, PostgreSQL, and transaction behavior.
+- The codebase needs review discipline to keep query styles coherent.
+- Mapping between transport/domain projections and persistence objects adds explicit code.
+- Integration tests require real PostgreSQL/PostGIS for database-specific behavior.
+- Lazy-loading and query-count regressions require active prevention and detection.
+
+### Revisit Triggers
+
+Review this decision if SQLAlchemy/Psycopg/PostGIS compatibility fails; profiling shows the ORM causes persistent unacceptable behavior despite explicit query use; mapping overhead becomes disproportionate; or a module has a proven need for a different persistence approach. Exceptions remain module-bounded and require integration/contract tests; they do not automatically replace the project-wide toolkit.
+
+### References
+
+- SQLAlchemy 2 typed declarative mapping: https://docs.sqlalchemy.org/en/20/orm/declarative_tables.html
+- SQLAlchemy 2 ORM querying: https://docs.sqlalchemy.org/en/20/orm/queryguide/select.html
+- SQLAlchemy relationship loading: https://docs.sqlalchemy.org/en/20/orm/loading_relationships.html
+- GeoAlchemy2 documentation: https://geoalchemy-2.readthedocs.io/
+
+### Affected Areas
+
+- `docs/TECH_STACK.md`
+- `docs/DATABASE_SCHEMA.md`
+- Domain persistence adapters and read projections
+- API response mapping
+- PostGIS, query-plan, authorization, and integration tests
+
+---
+
+## DEC-023 — 2026-10-18 — Use Alembic with Reviewed, Forward-Safe Database Migrations
+
+- **Status:** Accepted
+- **Decision owner:** Product Owner
+
+### Context
+
+Kirim needs reproducible PostgreSQL/PostGIS schema evolution coordinated with SQLAlchemy mappings, application deployments, persistent financial/workflow data, and managed-database recovery. Schema changes must be reviewable, testable, and safe under deployment overlap. SQLAlchemy model metadata alone is not migration history, while provider-console changes would not be reproducible. Alembic integrates with the selected SQLAlchemy toolkit, but its own documentation treats autogenerated revisions as candidates requiring manual review, and spatial operations need additional care.
+
+### Decision
+
+- Use **Alembic** as Kirim's database schema-migration tool.
+- Commit every migration and apply migrations in deterministic revision order.
+- Never edit, reorder, or delete a migration after it has been applied to any shared environment. Add a corrective migration instead.
+- Maintain one linear migration head by default. Parallel heads and merge revisions require explicit review and CI detection.
+- Treat Alembic autogeneration as a drafting aid only. Review generated operations, names, types, defaults, constraints, indexes, data-loss implications, downgrade behavior, and generated SQL before acceptance.
+- Permit reviewed Alembic operations and static/parameterized PostgreSQL/PostGIS SQL when explicit SQL is clearer or required. Never interpolate untrusted data into migration SQL.
+- Keep migrations self-contained and stable: do not import mutable runtime services, current ORM models, provider clients, or business workflows. Copy small stable helpers/constants into a migration when necessary and justified.
+- Execute migrations once per deployment through a controlled release/migration job with a dedicated identity and appropriate privileges. Do not let every API or Worker replica migrate automatically on startup.
+- Test migration from an empty database and from the previous supported schema against real PostgreSQL/PostGIS. CI must detect multiple heads and model/schema drift according to the eventual schema-check procedure.
+- Use expand-and-contract sequencing for changes where old and new application versions may overlap: add compatible structures, deploy compatible code/backfill, switch reads/writes, then remove obsolete structures in a later release.
+- Before destructive or high-risk operations, document backup/restore readiness, affected data/volume, lock/runtime expectations, application compatibility, abort criteria, and recovery steps.
+- Prefer a corrective forward migration for production recovery. Implement `downgrade()` only when genuinely safe and useful; never treat a destructive downgrade as an automatic rollback guarantee.
+- Separate large data backfills from blocking schema changes where practical. Make backfills bounded, observable, idempotent/resumable, and safe to pause.
+- Configure appropriate lock and statement timeouts and avoid long table locks. Index/constraint creation strategy must account for table size and the managed provider's PostgreSQL capabilities.
+- Verify PostGIS extension ownership/privileges and manually review spatial columns, SRIDs, functions, constraints, and indexes. If GeoAlchemy2 is selected, configure and test its Alembic helpers rather than assuming generic autogeneration is correct.
+- Do not run irreversible production migrations without explicit approval under the project's data-safety workflow.
+
+Exact Alembic/GeoAlchemy2 versions, file layout, revision naming convention, CI schema-drift command, deployment platform job, timeout values, and backup mechanism remain implementation/provider decisions.
+
+### Rationale
+
+- Alembic aligns with SQLAlchemy 2 and supports both declarative operations and explicit PostgreSQL SQL.
+- Versioned committed migrations make environments reproducible and changes reviewable.
+- Manual review compensates for autogeneration limitations, especially around constraints and spatial objects.
+- A single controlled migration job prevents races among replicas.
+- Forward-safe expand/contract changes protect deployments where application versions temporarily overlap.
+- Explicit recovery and backfill rules reflect Kirim's financial, audit, and workflow data sensitivity.
+
+### Alternatives Considered
+
+- **Versioned SQL with a separate or custom runner:** Not selected because it would give up useful SQLAlchemy metadata integration or require additional tooling while Alembic can still execute explicit SQL where appropriate.
+- **Flyway or Liquibase:** Not selected because a separate migration ecosystem/runtime provides no demonstrated MVP benefit for this Python/SQLAlchemy application.
+- **Provider-managed console changes:** Rejected because they are not an adequate reviewable, testable, repository-owned migration history.
+- **Automatic model-to-database synchronization at application startup:** Rejected because it is unsafe for production data, cannot represent controlled data transformations reliably, and can race across replicas.
+- **Always require reversible downgrades:** Not selected because many destructive/data transformations cannot be honestly reversed; backup/restore, application rollback compatibility, and corrective forward migrations are safer than fictional reversibility.
+
+### Consequences
+
+**Benefits**
+
+- Auditable and reproducible schema history.
+- Direct fit with the selected SQLAlchemy toolkit.
+- Controlled deployment and rollback/recovery planning.
+- Explicit treatment of PostGIS and data backfills.
+- CI can validate migration topology and upgrade behavior.
+
+**Costs and constraints**
+
+- Every generated migration requires human review and database testing.
+- Expand/contract changes can span multiple releases.
+- A release-job mechanism and migration credentials must be configured.
+- Realistic migration tests require PostgreSQL/PostGIS infrastructure.
+- Operational recovery may require forward fixes or database restoration rather than a simple downgrade command.
+
+### Revisit Triggers
+
+Review this decision if Alembic cannot safely represent a required migration; the system becomes polyglot with independently managed schemas; organizational database governance mandates another tool; or migration scale requires dedicated online-schema-change capabilities. Any replacement must preserve the applied revision history and provide a tested transition plan.
+
+### References
+
+- Alembic documentation: https://alembic.sqlalchemy.org/
+- Alembic autogeneration limitations/review guidance: https://alembic.sqlalchemy.org/en/latest/autogenerate.html
+- Alembic offline SQL mode: https://alembic.sqlalchemy.org/en/latest/offline.html
+- GeoAlchemy2 Alembic integration: https://geoalchemy-2.readthedocs.io/en/stable/alembic.html
+
+### Affected Areas
+
+- `docs/TECH_STACK.md`
+- `docs/DATABASE_SCHEMA.md`
+- Migration files and CI
+- Deployment/release workflow and credentials
+- PostgreSQL/PostGIS backup, recovery, and operational runbooks
+
+---
+
+## DEC-024 — 2026-10-18 — Use Small Explicitly Bounded SQLAlchemy Connection Pools Initially
+
+- **Status:** Accepted
+- **Decision owner:** Product Owner
+
+### Context
+
+Kirim's synchronous API and Worker processes need efficient connection reuse without exhausting the managed PostgreSQL service. SQLAlchemy creates a pool per process, so replicas, API processes, Worker processes, release jobs, and operational tools can multiply the effective connection demand. An external pooler can help at larger or highly elastic scale but adds configuration and compatibility concerns that are not yet justified for the invite-only MVP. Exact provider limits and deployment concurrency remain unselected.
+
+### Decision
+
+- Use SQLAlchemy's synchronous **`QueuePool`** initially for long-running API and Worker processes.
+- Configure `pool_size`, `max_overflow`, and `pool_timeout` explicitly; do not rely blindly on SQLAlchemy defaults.
+- Choose exact values only after selecting the managed PostgreSQL plan and deployment process/replica/Worker concurrency. Apply a documented connection budget:
+  - include every API replica and process;
+  - include every Worker replica/process;
+  - include migrations, support/administrative access, monitoring, and provider-reserved needs;
+  - budget for maximum configured overflow, not only steady-state pool size;
+  - retain a safety reserve below the provider/database connection limit.
+- Enable `pool_pre_ping` initially to detect stale/disconnected pooled connections. Set `pool_recycle` only when verified provider/network idle-lifetime behavior requires it.
+- Acquire sessions/connections as late as practical and release them promptly. Never retain a checked-out connection or open transaction while waiting for an external provider or user interaction.
+- Bound request, job, thread, and pool concurrency together. A larger pool is not a substitute for query/index optimization or short transactions.
+- Create engines/pools within each operating-system process after process creation. Never share live pooled connections across process forks.
+- Use a dedicated minimal pool or `NullPool` for one-off migration/release processes when appropriate, so they do not retain unnecessary connections.
+- Monitor current/peak database connections, pool checkout wait, checkout duration, overflow use, timeouts, transaction duration, and connection errors. Alert thresholds are an observability decision.
+- Do not introduce a self-managed PgBouncer initially.
+- If the selected provider requires or strongly recommends an external pooler/proxy, verify pooling mode and compatibility with Psycopg 3, SQLAlchemy, prepared statements, session state, advisory locks, temporary objects, LISTEN/NOTIFY if later used, and Alembic. Avoid unintentionally stacking persistent pools; use `NullPool` at the application layer when that is the tested design.
+
+Exact values and provider-specific parameters are deployment configuration and must be load-tested before production. This decision does not select the managed PostgreSQL provider or deployment topology.
+
+### Rationale
+
+- `QueuePool` provides sufficient connection reuse with no additional MVP service.
+- Explicit bounded settings prevent each process from silently consuming SQLAlchemy's default pool plus overflow allocation.
+- A global connection budget reflects the actual multiplicative effect of replicas/processes.
+- Deferring exact values avoids inventing capacity before provider limits and measured concurrency are known.
+- The strategy leaves a clear path to a provider/external pooler if deployment characteristics later require one.
+
+### Alternatives Considered
+
+- **Provider/external pooler such as PgBouncer immediately:** Not selected because the provider and workload are unknown, while pooling modes add feature and operational compatibility considerations.
+- **Layer a persistent SQLAlchemy pool over an external persistent pool by default:** Rejected because it can create redundant queueing and obscure connection capacity without a tested need.
+- **No connection reuse for long-running processes:** Rejected because repeatedly creating direct PostgreSQL connections adds avoidable latency and resource cost.
+- **Use default SQLAlchemy pool settings:** Rejected because defaults multiply per process/replica and may exceed a managed plan unexpectedly.
+- **Psycopg's separate pool under SQLAlchemy's pool:** Rejected initially because stacked application pools are unnecessary and make lifecycle/capacity behavior harder to reason about.
+
+### Consequences
+
+**Benefits**
+
+- Simple connection reuse within the existing SQLAlchemy stack.
+- Explicit protection against connection exhaustion.
+- Capacity can be calculated and tested per deployment topology.
+- No additional pooler service for the MVP.
+
+**Costs and constraints**
+
+- Every process still owns a separate pool, so autoscaling must remain connection-budget aware.
+- Configuration cannot be finalized until hosting and database plans are chosen.
+- Pool metrics and operational alerts must be implemented.
+- Highly elastic scaling may eventually require an external/provider pooler.
+
+### Revisit Triggers
+
+Review this decision if the selected provider mandates a connection proxy; maximum replica/process requirements cannot fit safely within the database connection limit; pool waits/timeouts remain unacceptable after query and transaction tuning; connection setup cost becomes material; or serverless/highly elastic deployment is approved. Any external pooler adoption requires compatibility and failure-mode testing plus updated connection budgeting.
+
+### References
+
+- SQLAlchemy connection pooling: https://docs.sqlalchemy.org/en/20/core/pooling.html
+- SQLAlchemy engine configuration: https://docs.sqlalchemy.org/en/20/core/engines.html
+- PostgreSQL connection settings: https://www.postgresql.org/docs/current/runtime-config-connection.html
+
+### Affected Areas
+
+- `docs/TECH_STACK.md`
+- API and Worker engine/session factories
+- Deployment process/replica/concurrency configuration
+- Managed PostgreSQL sizing
+- Migrations and administrative tooling
+- Load testing, metrics, alerts, and runbooks

@@ -1,6 +1,6 @@
 # Database Schema
 
-> Status: Draft — no database technology or domain model has been approved.
+> Status: Draft — PostgreSQL/PostGIS and core persistence tooling are approved; the domain schema remains undesigned.
 
 ## 1. Data Design Principles
 
@@ -63,12 +63,14 @@ Indexes must follow measured or clearly expected access patterns.
 
 ## 8. Migration Strategy
 
-- Tool: TBD
-- Naming/version convention: TBD
-- Backward-compatibility window: TBD
-- Backfill strategy: TBD
-- Rollback/recovery procedure: TBD
-- Migration tests: TBD
+- Tool: Alembic with reviewed committed revisions (`DECISIONS.md`, DEC-023).
+- Execution: One controlled deployment/release job; never automatic per API/Worker replica.
+- History: Do not edit an applied shared-environment migration; add a corrective revision. Maintain one head by default.
+- Compatibility: Use expand-and-contract when application versions may overlap; exact support window is TBD.
+- Backfills: Separate large backfills where practical and make them bounded, observable, idempotent/resumable, and safe to pause.
+- Rollback/recovery: Prefer corrective forward migrations; use downgrade only when genuinely safe. Require backup/recovery planning for destructive or high-risk changes.
+- Tests: Upgrade an empty database and the previous supported PostgreSQL/PostGIS schema; check heads, drift, spatial operations, locks, and affected data.
+- Naming/version convention, timeout values, backup mechanism, and exact CI commands: TBD.
 
 ## 9. Backup and Recovery
 
@@ -80,7 +82,7 @@ Indexes must follow measured or clearly expected access patterns.
 
 ## 10. Open Questions
 
-- [ ] Which datastore best fits the approved access and consistency needs?
+- [x] PostgreSQL with PostGIS is the authoritative datastore (`DECISIONS.md`, DEC-009).
 - [ ] Which records contain personal or regulated data?
 - [ ] Are soft deletion, audit history, or event history required?
 - [ ] What are the expected data volume and growth rate?

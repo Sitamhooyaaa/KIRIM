@@ -37,11 +37,11 @@ Use this file as a reminder of the major decisions required to build Kirim with 
 - [x] **DEC-018:** Pragmatic REST-style JSON API with OpenAPI and explicit action subresources.
 - [x] **DEC-019:** `/api/v1`, RFC 9457 errors, cursor pagination, allowlisted filters/sorts, idempotency keys, and optimistic/domain concurrency controls.
 - [x] **DEC-020:** CPython 3.14 runtime line; compatibility-test and lock exact FastAPI/Pydantic/Starlette/ASGI dependency set at scaffolding.
-- [ ] Python package and dependency-management tool.
-- [ ] PostgreSQL driver and synchronous/asynchronous access model.
-- [ ] ORM/query approach.
-- [ ] Database migration tool.
-- [ ] Connection-pooling strategy.
+- [ ] Python package and dependency-management tool — intentionally deferred to backend scaffolding; `uv` is the leading candidate, subject to Windows/Linux, deployment, and dependency-group verification.
+- [x] **DEC-021:** Psycopg 3 with synchronous PostgreSQL access initially for API and Worker.
+- [x] **DEC-022:** SQLAlchemy 2 hybrid with typed ORM mappings and explicit Core/parameterized SQL where appropriate.
+- [x] **DEC-023:** Alembic with reviewed committed migrations, controlled release execution, and forward-safe PostgreSQL/PostGIS policy.
+- [x] **DEC-024:** Small explicitly bounded SQLAlchemy `QueuePool` per long-running process; exact global connection budget deferred to deployment selection.
 - [ ] PostgreSQL job implementation or library.
 - [ ] Retry, backoff, timeout, leasing, and permanent-failure policy.
 - [ ] File-upload and evidence-processing architecture.
@@ -174,6 +174,6 @@ Use this file as a reminder of the major decisions required to build Kirim with 
 
 ## Current Progress
 
-- Major accepted decision records: **20**.
-- Remaining planning decisions: approximately **38**, depending on how supporting tools are grouped.
-- Current next topic: **Python package and dependency-management tool**.
+- Major accepted decision records: **24**.
+- Remaining planning decisions: approximately **34**, depending on how supporting tools are grouped.
+- Current next topic: **PostgreSQL durable-job implementation or library**.
