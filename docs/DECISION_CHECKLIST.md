@@ -64,11 +64,11 @@ Use this file as a reminder of the major decisions required to build Kirim with 
 
 - [ ] Flutter and Dart versions.
 - [ ] Supported Android OS versions and device baseline.
-- [ ] Flutter application architecture.
-- [ ] State-management approach.
-- [ ] Navigation and deep-link approach.
-- [ ] API client and OpenAPI model-generation approach.
-- [ ] Secure token/credential storage.
+- [x] **DEC-029:** Pragmatic feature-first Flutter architecture with optional layers based on actual complexity.
+- [x] **DEC-029:** Riverpod with manual providers initially, immutable unidirectional state, and widget-local state where appropriate.
+- [x] **DEC-030:** `go_router` with manual routes, verified HTTPS Android App Links, allowlisted targets, and Riverpod-backed bootstrap/auth redirects.
+- [x] **DEC-031:** Dio plus a pinned generated OpenAPI `dart-dio` transport package behind repositories, subject to a mandatory compatibility spike.
+- [x] **DEC-032:** Provider SDK-managed mobile refresh session, transient access tokens where practical, and narrowly scoped Keystore-backed fallback with credentials excluded from backup.
 - [ ] Local persistence and offline behavior.
 - [ ] Maps and route-display integration.
 - [ ] Location and background-location implementation.
@@ -174,6 +174,6 @@ Use this file as a reminder of the major decisions required to build Kirim with 
 
 ## Current Progress
 
-- Major accepted decision records: **28**.
-- Remaining planning decisions: approximately **30**, depending on how supporting tools are grouped.
-- Current next topic: **Flutter architecture and state management**.
+- Major accepted decision records: **32**.
+- Remaining planning decisions: approximately **25**, depending on how supporting tools are grouped.
+- Current next topic: **Flutter local persistence and offline behavior**.

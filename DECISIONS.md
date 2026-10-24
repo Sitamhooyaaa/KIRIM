@@ -2649,3 +2649,444 @@ Review this decision if Kirim expands far beyond the pilot and geography perform
 - PostgreSQL/PostGIS migrations and indexes
 - Flutter/map-provider coordinate handling
 - Spatial integration, boundary, and query-plan tests
+
+---
+
+## DEC-029 — 2026-10-18 — Use Pragmatic Feature-First Flutter Architecture with Riverpod
+
+- **Status:** Accepted
+- **Decision owner:** Product Owner
+
+### Context
+
+Kirim's single Android-first Flutter application supports Customer and Shopper modes across authentication, journeys, requests, negotiation, fulfilment, payments, messaging, evidence, safety, and account flows. The client needs testable asynchronous state and dependency substitution without duplicating the backend's authoritative authorization, payment, ledger, matching, or workflow rules. A global technical-folder structure becomes difficult to navigate as features grow, while full Clean Architecture for every screen would add interfaces, use cases, and mappings without demonstrated value. The Product Owner has not yet used the proposed state-management approach extensively and plans to learn it during implementation.
+
+### Decision
+
+**Architecture**
+
+- Organize the Flutter application primarily by product feature, with top-level `app` composition and a small `core` area for genuinely cross-cutting infrastructure/design primitives.
+- Within a feature, use pragmatic responsibilities as needed:
+  - `presentation`: screens, widgets, view formatting, controllers/notifiers, and user-event forwarding;
+  - `application`: client-side orchestration spanning repositories or multi-step UI operations;
+  - `domain`: optional immutable value objects/pure client logic only when complexity or reuse justifies it;
+  - `data`: API DTOs/clients, repository implementations, local/secure storage adapters, connectivity, and platform/provider adapters.
+- Do not create every layer, interface, use-case class, or mapper mechanically. Add boundaries where they protect complexity, testing, ownership, or replacement.
+- Align feature terminology with approved Kirim domain language and backend contracts, but do not mirror every backend module/class mechanically.
+- Widgets do not call HTTP, storage, authentication, notification, location, or other infrastructure clients directly.
+- Keep authoritative business authorization, workflow transitions, payment/ledger outcomes, matching eligibility, and settlement decisions on the backend. Client validation improves UX but never establishes permission or truth.
+
+**State management and dependency injection**
+
+- Use **Riverpod** as the primary mechanism for dependency composition/injection and shared asynchronous/application state.
+- Start with manually declared providers. Riverpod code generation is not required initially and may be adopted later only if the project already benefits from code generation and the trade-off is verified.
+- Use stable dependency providers for repositories/adapters and `Notifier`/`AsyncNotifier` or simpler read-only providers according to state behavior. Do not force one provider type onto every feature.
+- Use provider overrides/containers for unit and widget tests.
+- Do not introduce a parallel global service locator such as `get_it` without a separate demonstrated need and decision.
+- Keep providers feature-scoped/lifecycle-bounded where practical; avoid turning Riverpod into unstructured mutable global state.
+
+**State ownership and flow**
+
+- Use immutable state and unidirectional flow: user intent enters a controller/application operation, repositories/adapters perform work, and new state flows back to widgets.
+- Represent relevant loading, data, empty, validation, authorization, conflict/stale-state, retryable failure, permanent failure, and success states explicitly rather than relying on ambiguous booleans.
+- Keep purely local UI state in Flutter widget-local mechanisms when it does not need sharing, persistence, or orchestration—for example focus, animation, temporary expansion, and isolated tab selection.
+- Prevent duplicate consequential submissions, preserve the operation's idempotency key through retries, and refresh/reconcile authoritative server state after actions, push notifications, app resume, or detected cursor/version conflicts.
+- Treat local cache as an availability/performance aid. Do not let cached client state authorize or finalize backend workflow/payment decisions.
+- Do not implement offline consequential mutations unless separately approved with conflict, idempotency, and reconciliation requirements.
+
+**Learning and adoption controls**
+
+- Begin implementation with a small representative vertical slice and documented examples for dependency providers, an async screen controller, repository override testing, and widget-local versus shared-state choices.
+- Establish concise project conventions and review the first features before copying patterns across the app.
+- Prefer understandable manual code over advanced Riverpod features while the team is learning.
+- Exact Flutter/Dart/Riverpod versions and optional model/code-generation libraries remain subject to compatibility verification and locking at scaffolding.
+
+### Rationale
+
+- Feature-first organization keeps related UI, orchestration, and data code together as the application grows.
+- Pragmatic optional layers avoid boilerplate while preserving testable boundaries for complex flows.
+- Riverpod combines dependency composition, async state, lifecycle handling, and test overrides without requiring `BuildContext` in application logic.
+- Manual providers reduce code-generation/tooling complexity during initial learning.
+- Immutable unidirectional state follows Flutter's official architecture recommendations and makes async/conflict behavior easier to reason about.
+- A guided representative slice reduces adoption risk for a state-management tool the owner is learning.
+
+### Alternatives Considered
+
+- **Feature-first with Bloc/Cubit:** A valid alternative with explicit predictable transitions and strong tests, but not selected because Riverpod provides dependency composition and async state with less event/class ceremony for Kirim's current team and MVP.
+- **Global layer-first folders with Provider/`ChangeNotifier`:** Not selected because related feature code would scatter as the app grows and large mutable notifiers can become difficult to reason about.
+- **Full Clean Architecture for every feature:** Rejected because mandatory entities/use cases/interfaces/mappers would create disproportionate ceremony and encourage client duplication of server rules.
+- **`setState`/custom inherited state for the whole app:** Rejected as the sole approach because authentication, active role, server synchronization, messaging, and multi-screen workflows need shared testable state/dependencies. `setState` remains appropriate for local widget state.
+- **Riverpod code generation immediately:** Deferred because official Riverpod guidance treats it as optional and the project has not yet selected another reason to carry code generation.
+
+### Consequences
+
+**Benefits**
+
+- Clear feature ownership and navigation through the mobile codebase.
+- Testable dependencies and asynchronous state.
+- Less mandatory boilerplate than rigid Clean Architecture or event-heavy patterns.
+- Server remains authoritative while the client provides responsive UX.
+- Learning can proceed through one documented vertical slice.
+
+**Costs and constraints**
+
+- The team must learn Riverpod lifecycle, provider composition, and testing.
+- Conventions are required to prevent provider sprawl and hidden global state.
+- Pragmatic layering requires review judgment rather than mechanical folder rules.
+- Mapping remains necessary between API DTOs and client-facing models/state where boundaries differ.
+
+### Revisit Triggers
+
+Review this decision if the initial vertical slice shows Riverpod is materially harming comprehension/testability; provider lifecycle defects recur despite conventions; Bloc/Cubit offers a proven better fit for the implementing team; or application scale requires stronger package/module boundaries. A state-management migration must be feature-by-feature with behavior tests rather than a big-bang rewrite.
+
+### References
+
+- Flutter app architecture guide: https://docs.flutter.dev/app-architecture/guide
+- Flutter architecture recommendations: https://docs.flutter.dev/app-architecture/recommendations
+- Riverpod providers: https://riverpod.dev/docs/concepts2/providers
+- Riverpod testing: https://riverpod.dev/docs/how_to/testing
+- Riverpod code generation: https://riverpod.dev/docs/concepts/about_code_generation
+
+### Affected Areas
+
+- `docs/TECH_STACK.md`
+- Flutter repository/package structure and coding conventions
+- Mobile dependency composition, state, API/repository adapters, and local cache
+- Flutter unit, widget, and integration tests
+- Contributor onboarding and architecture examples
+
+---
+
+## DEC-030 — 2026-10-18 — Use go_router with Verified Android App Links
+
+- **Status:** Accepted
+- **Decision owner:** Product Owner
+
+### Context
+
+Kirim's Android-first Flutter app needs navigation from push notifications, authentication/session state, email verification/recovery, transaction messaging, evidence processing, and potentially OAuth/OIDC redirects. Deep links must work across cold start, background resume, active use, and logged-out/bootstrap states without treating a client route as authorization. Flutter's official guidance recommends a Router-based package such as `go_router` for applications with deep links and does not recommend named routes for most advanced navigation. A custom Router implementation would add substantial parsing, stack, restoration, and synchronization work; generated routing is not yet needed.
+
+### Decision
+
+**Router**
+
+- Use **`go_router`** as the Flutter application router.
+- Start with manually declared route configuration; do not introduce route code generation initially.
+- Compose the final router in the application layer while allowing feature modules to own route names/path definitions/builders through a controlled convention that avoids circular feature dependencies.
+- Use stable semantic route paths and opaque identifiers. Final screen hierarchy and paths remain a UI/API-contract task, not fixed by examples in this decision.
+- Use nested/shell navigation only when approved interface design requires it. Do not introduce multiple navigation stacks preemptively.
+
+**Android deep links**
+
+- Use verified HTTPS **Android App Links** on a Kirim-controlled domain for ordinary product deep links.
+- Publish and maintain `/.well-known/assetlinks.json` with the exact production application ID and signing-certificate SHA-256 fingerprints. Define separate safe handling for development/staging application IDs and signing keys.
+- Configure Android intent filters with `autoVerify` and test real domain association, not only `adb` route invocation.
+- Custom URI schemes may be used only where an approved identity/provider flow requires and permits them, following DEC-013 and current native-app OAuth guidance. They are not the default product-link mechanism.
+
+**Routing, authentication, and authorization**
+
+- Integrate router refresh/redirect decisions with Riverpod-managed bootstrap/authentication/account state through a small explicit adapter rather than a second state system.
+- Route redirects/guards provide UX flow only. The backend reauthorizes every resource read and action; a route, identifier, or successful link match never proves access.
+- Queue an intended deep-link target until required app bootstrap/session restoration completes. If login or verification is required, preserve only an allowlisted normalized destination and reevaluate it after authentication.
+- Do not create redirect loops. Define safe destinations for logged-out, unverified, suspended/security-held, unavailable, unauthorized, and malformed/unknown targets.
+- Use disclosure-safe outcomes when a resource is missing or inaccessible.
+
+**Link and push security**
+
+- Allowlist supported schemes, hosts, paths, parameter names, value formats, and length limits. Reject malformed, oversized, unexpected, nested, or ambiguous URLs.
+- Never implement a general client-supplied return/redirect URL without strict origin/path allowlisting.
+- Do not place access/refresh tokens, personal data, message contents, payment details, location evidence, or storage object keys in ordinary product URLs.
+- Handle provider-managed one-time verification, recovery, and OAuth parameters only through the selected provider's verified flow, with replay, expiry, state/nonce/PKCE, and redirect validation as applicable.
+- Push notifications carry a server-defined allowlisted target/event type and opaque resource identifier, not an arbitrary URL. The app maps that target to a known route and then authenticates/authorizes/fetches authoritative state.
+
+**Lifecycle and restoration**
+
+- Support and test deep links for terminated, backgrounded, and already-running app states, including links received while logged out or during session/bootstrap restoration.
+- Deduplicate repeated push/link navigation events and avoid stacking duplicate detail screens unintentionally.
+- Use navigation restoration where it improves UX, but never trust restored workflow/account data. Refresh authoritative state after restoration and require recent authentication where policy demands it.
+- Do not automatically restore a sensitive evidence/payment/support view when the current principal/session no longer has the required assurance or access.
+
+**Testing and operations**
+
+- Test route parsing/redirects independently and through Android integration tests for cold/warm/background launch, back stacks, wrong-user identifiers, revoked/expired sessions, suspended/unverified accounts, malformed/unknown links, duplicated pushes, and unavailable resources.
+- Test production-like domain verification with release-signing fingerprints before controlled distribution.
+- Monitor deep-link failures in a privacy-safe way without logging sensitive full URLs or one-time parameters.
+
+Exact `go_router`/Flutter versions, domain, app IDs, route paths, shell/tab structure, OAuth callback paths, and fallback web pages remain future verified decisions/configuration.
+
+### Rationale
+
+- `go_router` follows Flutter guidance and supports URL parsing, redirects, nested navigation, deep linking, and restoration without a custom Router framework.
+- Verified HTTPS App Links establish domain-to-app association and provide safer product links than an unverified custom scheme.
+- Manual route configuration avoids adding code generation while architecture/state patterns are being learned.
+- Server reauthorization and allowlisted targets prevent navigation state from becoming a security boundary.
+- Durable target handling across app lifecycle is necessary for push and identity flows.
+
+### Alternatives Considered
+
+- **Custom Router/Navigator 2 implementation:** Rejected because Kirim has no unique navigation requirement that justifies maintaining parsing, stack, restoration, and deep-link machinery.
+- **`auto_route`:** Not selected initially because generated typed routes require additional code-generation tooling and structure without a demonstrated MVP benefit. It remains a potential revisit if route-scale/type-safety problems emerge.
+- **Named routes:** Rejected because Flutter does not recommend them for most applications with advanced navigation/deep links and their deep-link behavior is limited.
+- **Custom URI schemes for all links:** Rejected because schemes are not domain-verified and can collide/be claimed; verified HTTPS App Links are the product default.
+- **Arbitrary URL in push payload:** Rejected because it creates open-navigation/validation risk and unnecessarily exposes link data.
+
+### Consequences
+
+**Benefits**
+
+- Standard Flutter deep-link/navigation approach.
+- Verified domain-bound Android links.
+- Safe integration with authentication and push flows.
+- No initial navigation code-generation dependency.
+- Testable route parsing and lifecycle behavior.
+
+**Costs and constraints**
+
+- Router/Riverpod refresh integration requires careful loop-free design.
+- Domain association depends on correct hosting and signing fingerprints.
+- Cold-start/bootstrap target preservation adds state-machine behavior.
+- Every deep-linked screen still needs loading, unavailable, and unauthorized states.
+
+### Revisit Triggers
+
+Review this decision if route configuration becomes unmanageably repetitive; compile-time route generation offers demonstrated value; Flutter/go_router support changes materially; approved multi-tab navigation needs stronger generated hierarchy; or iOS universal-link support is added. Any routing migration must preserve supported external URLs or provide explicit redirects/deprecation.
+
+### References
+
+- Flutter navigation and routing: https://docs.flutter.dev/ui/navigation
+- Flutter Android App Links: https://docs.flutter.dev/cookbook/navigation/set-up-app-links
+- `go_router` package: https://pub.dev/packages/go_router
+- `go_router` redirection: https://pub.dev/documentation/go_router/latest/topics/Redirection-topic.html
+
+### Affected Areas
+
+- `docs/TECH_STACK.md`
+- Flutter application composition and feature routes
+- Android manifest and domain `assetlinks.json`
+- Authentication, recovery, OAuth, push, and session bootstrap
+- Route/deep-link unit, widget, and Android integration tests
+- Release signing and environment configuration
+
+---
+
+## DEC-031 — 2026-10-18 — Use Dio with a Generated OpenAPI Transport Package Behind Repositories
+
+- **Status:** Accepted
+- **Decision owner:** Product Owner
+
+### Context
+
+The Flutter client must consume Kirim's OpenAPI-defined REST API, attach provider access tokens, preserve idempotency and concurrency headers, decode RFC 9457 failures, paginate, and stream/cancel evidence transfers with progress. Handwritten clients are straightforward but can drift from the backend contract. OpenAPI Generator provides a stable `dart-dio` target, while Dio supports interceptors, cancellation, multipart data, progress, and separate timeouts. Generated output may still mishandle particular OpenAPI 3.1/FastAPI schemas, so correctness must be proven before it becomes the build path.
+
+### Decision
+
+**Transport and generated boundary**
+
+- Use **Dio** as the Flutter HTTP transport.
+- Generate an isolated Dart transport client/package from the approved FastAPI OpenAPI document using OpenAPI Generator's **`dart-dio`** target, subject to a mandatory compatibility spike.
+- Pin the generator version and configuration. Pin compatible Dio/serialization/runtime dependencies through the Flutter lockfile.
+- Keep generated operations and DTOs inside the data/transport boundary. Feature repositories/adapters map transport results into application/domain/view models where separation is useful.
+- Widgets and Riverpod presentation controllers do not call generated API classes or Dio directly.
+- Never edit generated files manually. Change the OpenAPI contract, generator configuration/template under explicit ownership, or a handwritten wrapper instead.
+- Commit the generator configuration and, initially, the generated output for inspectable/reproducible builds. CI regenerates from the canonical OpenAPI artifact and fails on uncommitted differences.
+
+**Mandatory compatibility spike**
+
+Before accepting generated code into the implementation baseline, verify the selected FastAPI/OpenAPI and pinned generator combination for:
+
+- OpenAPI 3.1 parsing and required/nullable/omitted semantics;
+- enums and any approved polymorphic schemas;
+- RFC 9457 base problems and Kirim validation extensions;
+- cursor page schemas;
+- `Idempotency-Key`, `ETag`, `If-Match`, correlation, retry, and relevant response headers;
+- `201`, `202`, `204`, conflict, precondition, validation, authentication, authorization, and rate-limit responses;
+- multipart bounded evidence upload, progress, cancellation, and retry reconstruction;
+- authorized binary evidence download and metadata/filename handling;
+- ISO-8601 UTC date/time and monetary representation once approved;
+- deterministic generation on Windows development and Linux CI;
+- generated serialization, equality, unknown-enum/field, and backward-compatible additive-change behavior.
+
+Do not weaken or distort an approved backend contract solely to satisfy generator limitations. If a bounded operation/schema cannot generate correctly, implement a documented handwritten Dio transport adapter for that exception and retain contract/integration tests. If failures are broad, return for a generator-strategy decision rather than maintaining extensive custom templates silently.
+
+**Dio client policy**
+
+- Construct Dio through one controlled environment-aware client factory and inject it through Riverpod/repositories.
+- Configure HTTPS base URL, connect/send/receive timeouts, request cancellation, safe client-version/user-agent metadata, correlation headers, authentication, and RFC 9457 decoding centrally where semantics are truly cross-cutting.
+- Allow operation-specific timeout/stream/progress behavior, especially for evidence transfer, without mutable feature-level changes to global Dio configuration.
+- Do not apply global automatic retries. Retry only operations whose contract and idempotency policy permit it, preserving the same operation intent and idempotency key.
+- Redact logs. Never log credentials/tokens, password/recovery data, full URLs containing one-time parameters, message/evidence content, precise location, payment data, or unnecessary personal data.
+
+**Authentication and failures**
+
+- Obtain a valid provider access token through the approved authentication/session adapter from DEC-013; feature code does not read token storage directly.
+- Handle `401` through one bounded session-refresh/recovery path. Prevent refresh stampedes and infinite interceptor replay loops.
+- Do not replay a consequential request after authentication uncertainty unless its idempotency key, request body/fingerprint, current user intent, and server/provider outcome rules make the replay safe.
+- Map Dio/network/generated failures into stable application failure categories while preserving safe Kirim problem code, status, detail, validation issues, request ID, retry information, conflict/precondition metadata, and unknown-safe fallback behavior.
+- Screens/controllers do not branch on raw Dio exceptions.
+
+Exact generator serialization library, package layout, templates, artifact handoff from backend CI, and version pins remain subject to the spike and scaffolding decision.
+
+### Rationale
+
+- Dio directly supports Kirim's multipart progress, cancellation, interceptor, and timeout needs.
+- OpenAPI generation reduces repetitive transport code and exposes backend/client contract changes through diffs and compilation.
+- Repository wrappers prevent generated DTOs and transport behavior from becoming UI/domain architecture.
+- A compatibility spike recognizes that generator labels do not prove support for Kirim's exact OpenAPI 3.1 schemas.
+- Narrow handwritten exceptions are safer than changing correct API semantics to appease tooling.
+
+### Alternatives Considered
+
+- **Handwritten `package:http` client:** Not selected because cancellation, upload progress, interceptors, and shared error/auth behavior would require more custom work and contracts could drift.
+- **Handwritten Dio client:** Not selected as the default because it retains model/operation duplication despite using OpenAPI as the approved contract. It remains the bounded fallback for unsupported generated operations.
+- **Retrofit/Dio annotations:** Not selected because API declarations would be duplicated separately from the authoritative OpenAPI document.
+- **Expose generated DTOs directly to widgets:** Rejected because generator/schema changes would couple presentation to transport and risk accidental field disclosure/semantic leakage.
+- **Generate without pinning or diff verification:** Rejected because builds and generated APIs could change when tooling changes.
+
+### Consequences
+
+**Benefits**
+
+- Contract-aligned typed transport and less repetitive request/serialization code.
+- Dio supports evidence transfer and central cross-cutting HTTP behavior.
+- Generated-code changes are reviewable and CI-verifiable.
+- Feature architecture remains insulated through repositories.
+
+**Costs and constraints**
+
+- The project carries generator tooling and generated code.
+- Generator output may be large or awkward and requires a compatibility gate.
+- Contract changes can create substantial generated diffs that need semantic review.
+- Handwritten exceptions need explicit ownership to avoid becoming an untracked second client.
+
+### Revisit Triggers
+
+Review this decision if the compatibility spike broadly fails; generator upgrades cause recurring unstable/broken output; generated code materially harms build time or comprehension; the API adopts unsupported contract features; or Flutter/Dart package support changes. A replacement must preserve contract drift detection and repository isolation.
+
+### References
+
+- OpenAPI Generator `dart-dio`: https://openapi-generator.tech/docs/generators/dart-dio/
+- OpenAPI Generator configuration: https://openapi-generator.tech/docs/configuration/
+- Dio package: https://pub.dev/packages/dio
+- Flutter networking overview: https://docs.flutter.dev/data-and-backend/networking
+
+### Affected Areas
+
+- `docs/TECH_STACK.md`
+- `docs/API_CONTRACTS.md`
+- Flutter generated transport package and repository adapters
+- Backend OpenAPI generation/artifact workflow
+- Flutter dependency lock, CI drift checks, and contract/integration tests
+- Authentication, evidence transfer, errors, retries, and diagnostics
+
+---
+
+## DEC-032 — 2026-10-18 — Let the Provider SDK Own Mobile Refresh Sessions with Keystore-Backed Fallback
+
+- **Status:** Accepted
+- **Decision owner:** Product Owner
+
+### Context
+
+DEC-013 assigns mobile OAuth/OIDC refresh-session management to the selected authentication provider. The Flutter client still needs safe process-restoration behavior without storing passwords, embedding a native client secret, exposing tokens to features, or relying on ordinary local preferences/databases. Android Keystore can protect app cryptographic keys from normal export, but provider SDK storage behavior, hardware backing, backup, migration, and corruption handling vary and must be verified. Kirim's server-side account/security state remains authoritative even when a provider token is cryptographically valid.
+
+### Decision
+
+**Provider session ownership**
+
+- Prefer the selected authentication provider's official supported Flutter/Android SDK to own persistent provider refresh/session credentials and their rotation/replacement lifecycle.
+- Approve a provider only after verifying its Android at-rest storage, refresh-token rotation/replay behavior, process-death restoration, logout/revocation, backup/device-transfer behavior, maintained Flutter support, and compatibility with DEC-013/DEC-017.
+- Do not duplicate a provider-managed refresh token into separate Kirim storage.
+- Keep short-lived access tokens in memory where practical. Obtain them through a Kirim authentication-session interface; features, widgets, repositories, and Dio interceptors do not read storage directly.
+- Do not persist user passwords. Do not persist ID tokens unless the selected provider integration demonstrates a necessary, bounded purpose; never use an ID token as the Kirim API credential.
+- Do not embed an OAuth client secret in the Flutter application. The native app is a public client.
+
+**Kirim-owned secure storage**
+
+- If Kirim must persist a secret or short-lived authorization-transaction value not safely owned by the provider SDK, use a narrowly scoped secure-storage adapter whose Android implementation uses Keystore-protected cryptographic material.
+- `flutter_secure_storage` is the leading fallback candidate, not yet selected, subject to supported-Android, algorithm/Keystore, migration, backup, failure, and maintenance verification.
+- Inject the adapter behind an interface; feature code does not depend directly on a storage plugin.
+- Namespace records by environment, application identity, account/session where applicable, and credential purpose. Prevent staging and production credential mixing.
+- Minimize stored values and define creation, replacement, expiry, deletion, and corruption behavior for each key.
+- If a value is missing, corrupt, undecryptable, restored without its key, or invalidated by device security changes, fail closed: clear unusable state and require safe reauthentication rather than bypassing protection.
+
+**OAuth transaction state**
+
+- Keep PKCE verifiers, OAuth `state`, OIDC nonce, and related authorization transaction state short-lived, integrity-protected, single-use, and scoped to the initiating flow.
+- Preserve an intended post-login destination only as an allowlisted normalized internal target under DEC-030; do not store arbitrary redirect URLs.
+- Never place credentials or sensitive authorization parameters in logs, analytics, crash reports, clipboard, ordinary product links, or unredacted diagnostics.
+
+**Backup and device transfer**
+
+- Exclude authentication credentials and Kirim secure-storage records from Android Auto Backup/cloud device transfer.
+- Verify provider/plugin-specific backup exclusions rather than assuming app-private or encrypted storage is safe to restore.
+- Test uninstall/reinstall, device restore/transfer, application upgrade, signing configuration, and Keystore-key invalidation. Restored encrypted data without a usable key must result in reauthentication.
+- Non-secret preferences and approved cache data follow the later local-persistence/backup decision and must remain separated from credentials.
+
+**Logout, compromise, and local cleanup**
+
+- On logout, request provider revocation/session termination where supported, clear provider and Kirim-held credentials, clear or account-partition sensitive caches, reset Riverpod authentication/application state, and navigate to a safe route.
+- Define safe partial-failure behavior for offline or provider-revocation failure; local logout does not falsely claim server/provider revocation succeeded.
+- Account suspension, security hold, authentication-valid-after/security-version, and backend authorization checks from DEC-017 remain authoritative even if the device retains a token.
+- Rooting/device compromise can weaken local protections; Keystore reduces extraction risk but is not proof that the device or app process is trustworthy.
+- Hardware-backed/StrongBox storage is used where transparently available and supported, but is not an MVP device requirement unless later risk/device research approves it.
+- Biometric gating is not required initially and would not replace provider/server authentication or authorization.
+
+**Testing**
+
+- Test process death/restoration, concurrent access-token requests, refresh rotation, revoked/replayed refresh sessions, offline/partial logout, corrupt/missing/invalidated storage, app upgrades, backup/restore/device transfer, reinstall, environment isolation, and suspended/security-held accounts.
+- Ensure logs, crash reports, analytics, screenshots used in tests, and generated diagnostics contain no live credentials.
+
+Exact provider SDK, secure-storage plugin/version, backup XML/rules, token lifetimes, and biometric/device-integrity features remain later verified decisions.
+
+### Rationale
+
+- Provider ownership avoids reimplementing refresh rotation and atomic replacement in Kirim code.
+- Keystore-backed fallback provides a bounded mechanism for Kirim-owned secrets without using ordinary preferences/databases.
+- In-memory access tokens reduce persistent exposure.
+- Excluding credentials from backup avoids restoring ciphertext without device-bound keys and prevents session transfer.
+- A single auth-session interface limits secret access and simplifies replacement/testing.
+- Backend security state provides compromise control independent of local deletion success.
+
+### Alternatives Considered
+
+- **Store every token using `flutter_secure_storage`:** Not selected because it would duplicate provider SDK session ownership and make Kirim responsible for refresh replacement/storage semantics unnecessarily. The package remains a fallback candidate.
+- **Memory-only refresh/session state:** Not selected because Android process death would force frequent login and conflict with the approved provider-managed refresh-session experience.
+- **Shared preferences, SQLite, Hive, or ordinary files:** Rejected for long-lived authentication secrets because app-private storage alone does not provide the selected cryptographic/key-management boundary.
+- **Embed a mobile client secret:** Rejected because installed native apps cannot keep a shared secret confidential.
+- **Require StrongBox/biometrics on all devices:** Not selected because support varies and no approved risk requirement justifies excluding otherwise-supported pilot devices.
+
+### Consequences
+
+**Benefits**
+
+- Clear ownership of refresh-session rotation and persistence.
+- Minimized persistent token exposure and direct secret access.
+- Safe failure to reauthentication when storage cannot be trusted/recovered.
+- Compatibility with server-side compromise and suspension controls.
+
+**Costs and constraints**
+
+- Provider selection requires detailed SDK/storage testing.
+- Provider storage can create migration/lock-in considerations.
+- Backup rules and device-upgrade scenarios need Android integration tests.
+- A fallback adapter may still require a third-party plugin and migration policy.
+
+### Revisit Triggers
+
+Review this decision if the selected provider SDK does not protect/persist sessions adequately; the app adopts a Kirim token-exchange/session architecture; supported devices cannot meet storage requirements; provider replacement requires controlled credential migration; or approved biometric/device-bound assurance is introduced. Never migrate refresh credentials between storage owners without a tested rotation/revocation plan.
+
+### References
+
+- Android Keystore: https://developer.android.com/privacy-and-security/keystore
+- Android backup security: https://developer.android.com/privacy-and-security/risks/backup-best-practices
+- RFC 8252, OAuth 2.0 for Native Apps: https://www.rfc-editor.org/rfc/rfc8252.html
+- RFC 9700, OAuth 2.0 Security Best Current Practice: https://www.rfc-editor.org/rfc/rfc9700.html
+
+### Affected Areas
+
+- `docs/TECH_STACK.md`
+- Flutter authentication/session adapter and Dio integration
+- Android manifest/backup rules and secure storage
+- Identity-provider selection and compatibility spike
+- Logout, account compromise, local cache partitioning, and navigation
+- Security, upgrade, device-transfer, and integration tests

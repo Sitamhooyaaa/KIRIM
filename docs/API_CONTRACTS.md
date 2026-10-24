@@ -120,10 +120,13 @@ Document signing, ordering, duplication, retry, dead-letter, and replay behavior
 
 ## 5. Contract Validation
 
-- Schema linting/generation: TBD
-- Consumer/provider contract tests: TBD
-- Breaking-change detection: TBD
-- Deprecation period: TBD
+- Flutter transport: Generate a pinned OpenAPI Generator `dart-dio` package behind repositories after the mandatory OpenAPI 3.1 and Kirim contract-shape spike (`DECISIONS.md`, DEC-031).
+- Generated output/configuration is committed initially; CI regenerates from the canonical OpenAPI artifact and fails on drift. Generated files are never manually edited.
+- Unsupported bounded operations may use documented handwritten Dio adapters without weakening the approved API contract; broad generator incompatibility requires a new decision.
+- Schema linting and exact canonical-artifact workflow: TBD.
+- Consumer/provider contract tests: TBD, including RFC 9457, nullable/omitted fields, enums, headers, cursor pages, multipart/binary transfer, and additive compatibility.
+- Breaking-change detection: TBD.
+- Deprecation period: TBD.
 
 ## 6. Open Questions
 
