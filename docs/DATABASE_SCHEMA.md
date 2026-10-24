@@ -10,6 +10,7 @@
 - Store timestamps consistently (prefer UTC) and document precision.
 - Classify sensitive data and minimize its collection.
 - Design migrations to be reversible or provide a tested recovery procedure.
+- Use EPSG:4326 with explicit PostGIS geometry/geography types; never perform authoritative distance or containment using untyped latitude/longitude arithmetic (`DECISIONS.md`, DEC-028).
 
 ## 2. Data Classification and Lifecycle
 
@@ -48,7 +49,7 @@ Replace the placeholder only after requirements identify the core entities.
 
 ## 6. Indexes and Access Patterns
 
-Indexes must follow measured or clearly expected access patterns.
+Indexes must follow measured or clearly expected access patterns. Spatial matching/containment uses reviewed GiST indexes and real PostGIS query-plan tests. Route thresholds use geography `ST_DWithin` in metres; geofence point eligibility uses boundary-inclusive geometry `ST_Covers` (`DECISIONS.md`, DEC-028).
 
 | Table | Query/access pattern | Index | Unique | Notes |
 |---|---|---|---:|---|

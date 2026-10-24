@@ -45,8 +45,8 @@ Use this file as a reminder of the major decisions required to build Kirim with 
 - [ ] PostgreSQL job implementation or library — intentionally deferred to backend scaffolding; Procrastinate is the leading candidate, subject to the approved transaction, Python 3.14, Psycopg 3/SQLAlchemy 2, crash-recovery, and connection-budget spike.
 - [x] **DEC-025:** Job-class-specific at-least-once handling with idempotency, bounded jittered retries, short leases, reconciliation, and visible permanent failure.
 - [x] **DEC-026:** Backend-streamed evidence transfer to private object storage with quarantine processing, immutable originals, controlled derivatives, and audited access.
-- [ ] In-app messaging delivery approach.
-- [ ] PostGIS coordinate system, geometry model, and distance semantics.
+- [x] **DEC-027:** Durable REST messaging with PostgreSQL ordering, push hints, and foreground cursor refresh; no initial persistent socket.
+- [x] **DEC-028:** EPSG:4326 canonical coordinates; geography metre distances, geometry versioned geofences, boundary-inclusive coverage, and GiST indexing.
 
 ## D. Authentication and Authorization
 
@@ -174,6 +174,6 @@ Use this file as a reminder of the major decisions required to build Kirim with 
 
 ## Current Progress
 
-- Major accepted decision records: **26**.
-- Remaining planning decisions: approximately **32**, depending on how supporting tools are grouped.
-- Current next topic: **in-app messaging delivery approach**.
+- Major accepted decision records: **28**.
+- Remaining planning decisions: approximately **30**, depending on how supporting tools are grouped.
+- Current next topic: **Flutter architecture and state management**.

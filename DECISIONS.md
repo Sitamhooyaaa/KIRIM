@@ -2434,3 +2434,218 @@ Review this decision if measured bandwidth/cost, upload reliability, API connect
 - Flutter upload/download UX
 - Admin/Support evidence review
 - Object storage, Worker processing, retention/deletion, audit, and observability
+
+---
+
+## DEC-027 — 2026-10-18 — Use Durable REST Messaging with Push Hints and Foreground Cursor Refresh
+
+- **Status:** Accepted
+- **Decision owner:** Product Owner
+
+### Context
+
+Kirim requires transaction-scoped communication for negotiation, substitutions, shopping, handover coordination, failed-delivery procedure, disputes, and support evidence. Messages must remain available across disconnections and app restarts and may become dispute evidence. Android background execution and network connectivity are unreliable, while permanent WebSocket/SSE connections would still require durable persistence, push fallback, and catch-up. The invite-only MVP does not require typing indicators, presence, or sub-second real-time guarantees.
+
+### Decision
+
+**Authoritative delivery model**
+
+- Use REST-style message creation and cursor-based retrieval backed by authoritative PostgreSQL persistence.
+- Use Android push notifications only as best-effort hints that prompt an authenticated client to synchronize. Push receipt is never authoritative proof of message delivery, reading, or workflow completion.
+- While an eligible conversation screen is active, use bounded adaptive foreground polling/cursor refresh. Reduce or stop aggressive polling when the conversation is not active or the app is backgrounded.
+- Do not implement WebSockets, Server-Sent Events, or a third-party managed chat service initially.
+
+**Message creation and ordering**
+
+- Authorize every send against the authenticated account, transaction/conversation relationship, account status, and workflow/policy rules.
+- Require a client-generated idempotency identifier scoped to the sender/conversation so retries do not create duplicate messages.
+- Persist the message before creating notification work, and create the transactional outbox/job record atomically with the message transaction.
+- Assign an authoritative server message identifier, server receipt timestamp, and deterministic per-conversation ordering value with a unique tie-breaker. Client timestamps are presentation metadata only and do not establish order.
+- Preserve original accepted message content as immutable evidence. Corrections, moderation/system notices, redactions required by approved policy, or follow-up context use linked append-only records/events rather than silent overwrite.
+- Exact edit/delete/redaction product behavior is not inferred by this decision and requires explicit requirements if introduced.
+
+**Synchronization**
+
+- Retrieve messages using opaque cursor pagination consistent with DEC-019.
+- On opening, resuming, push handling, reconnecting, or detecting a cursor gap, fetch authoritative messages after the last acknowledged cursor and reconcile local state.
+- Design clients to tolerate duplicate push events, duplicate HTTP responses/retries, out-of-order notification arrival, and missing notifications.
+- Exact polling intervals, backoff, page limits, local cache duration, and acknowledgement/read-state behavior require mobile/network/product testing.
+
+**Push privacy and security**
+
+- Keep push payloads minimal and avoid sensitive message text on lock screens by default. Include only opaque routing/synchronization information needed to open the app safely.
+- Opening a push does not grant access. The client must authenticate, and the API must reauthorize current conversation access before returning content.
+- Token invalidation and push-delivery failure must not alter message persistence or make content inaccessible through normal synchronization.
+
+**Privacy, evidence, and support access**
+
+- Limit conversation access to authorized transaction participants and explicitly assigned Support users under case scope. Audit Support/Admin message access where required by the approved sensitive-evidence policy.
+- Retain messages according to the approved 90-day post-closure category unless dispute, fraud, accounting/legal, deletion, or another approved hold/exception applies.
+- Do not claim end-to-end encryption because Kirim must support authorized server-side dispute/evidence review. Use TLS in transit and provider/database encryption controls at rest.
+- Do not expose personal phone numbers or require off-platform communication.
+- Route permitted message attachments through the Evidence and Files architecture in DEC-026; do not create an independent public chat-upload path.
+
+**Future real-time upgrade**
+
+- Preserve REST persistence, cursor catch-up, push fallback, authorization, and audit as the authoritative design if WebSockets or SSE are later added.
+- A real-time transport is an optional acceleration channel only; it must tolerate reconnect/replay and cannot become the sole delivery path.
+
+### Rationale
+
+- Durable REST persistence works across mobile disconnects and app lifecycle transitions.
+- Push provides background awareness without becoming a source of truth.
+- Foreground polling is operationally simple and adequate for the small pilot.
+- Avoiding persistent connections removes connection authentication, fan-out, backpressure, and cross-replica infrastructure before measurements justify them.
+- Cursor catch-up and immutable server ordering preserve evidence integrity and deterministic synchronization.
+
+### Alternatives Considered
+
+- **WebSockets plus push fallback:** Deferred because they add persistent-connection lifecycle and cross-replica fan-out while REST, push, and catch-up remain necessary anyway.
+- **Server-Sent Events plus REST sending:** Deferred because they retain persistent mobile-connection/reconnection complexity without a demonstrated MVP benefit.
+- **Managed third-party chat:** Not selected because sensitive message retention, authorization, dispute evidence, export/deletion, provider processing, and audit requirements would add dependency and governance complexity.
+- **Push payload as the message:** Rejected because push delivery can be delayed, duplicated, omitted, or exposed on lock screens and is not authoritative persistence.
+- **Client timestamps for canonical ordering:** Rejected because device clocks are untrusted and inconsistent.
+
+### Consequences
+
+**Benefits**
+
+- Simple, inspectable, durable MVP communication.
+- Offline/background-safe catch-up.
+- No additional real-time broker or connection infrastructure.
+- Strong message evidence, authorization, and retention boundaries.
+
+**Costs and constraints**
+
+- Foreground message arrival has a bounded polling delay.
+- Polling interval and query/index design require testing to avoid waste.
+- Push infrastructure is still needed for background awareness.
+- WebSocket-like presence/typing behavior is unavailable initially.
+
+### Revisit Triggers
+
+Review this decision if measured foreground latency materially harms task completion/safety; polling load or battery/network cost becomes unacceptable; message volume exceeds the selected approach; or approved features require real-time presence/typing/streaming. Any upgrade must retain durable REST/cursor synchronization and push fallback and requires authentication, authorization, fan-out, capacity, reconnect, and abuse testing.
+
+### Affected Areas
+
+- `docs/TECH_STACK.md`
+- `docs/API_CONTRACTS.md`
+- Communication and Notifications module
+- Flutter local synchronization and notification handling
+- PostgreSQL message schema/indexes and transactional outbox
+- Support evidence access, retention, audit, metrics, and testing
+
+---
+
+## DEC-028 — 2026-10-18 — Use WGS 84 with Geography-Based Metric Distance and Geometry Geofences
+
+- **Status:** Accepted
+- **Decision owner:** Product Owner
+
+### Context
+
+Kirim needs consistent spatial semantics for the versioned pilot geofence, 1 km route-matching corridor, journey routes, shop/delivery points, and location-linked evidence. External mobile/map coordinates use longitude/latitude, while distance thresholds are specified in metres. Treating degrees as metres is incorrect; storing a projected local CRS as the primary external representation would add conversion and coordinate-mixing risk. PostGIS supports geodetic `geography` distance predicates in metres and `geometry` polygon validity/containment operations.
+
+### Decision
+
+**Canonical coordinates**
+
+- Use **WGS 84 / EPSG:4326** as Kirim's canonical stored and external coordinate reference system.
+- API and GeoJSON coordinate order is always `[longitude, latitude]`. Never silently interpret `[latitude, longitude]`.
+- Validate numeric finiteness and valid longitude/latitude ranges at every external boundary. Apply additional purpose/pilot sanity bounds where approved.
+- Do not use elevation/Z values in MVP eligibility or distance decisions unless a later requirement explicitly introduces them.
+
+**PostGIS types**
+
+- Use `geography(Point, 4326)` for canonical location points and location-linked evidence where metre distance is relevant.
+- Use `geography(LineString, 4326)` for canonical journey routes used in proximity matching.
+- Use valid `geometry(MultiPolygon, 4326)` for versioned pilot geofence boundaries. Normalize approved Polygon inputs to MultiPolygon where the schema requires it.
+- Use GiST indexes on spatial columns used by proximity/containment queries, with indexes and query plans verified against representative data.
+- Do not duplicate every spatial value in both geography and projected geometry. Temporary query transformations or bounded non-authoritative display derivatives are allowed when justified.
+
+**Route corridor and distance**
+
+- Implement the approved 1 km route corridor using indexed `ST_DWithin(route_geography, point_geography, 1000)` or its semantically equivalent argument order.
+- Distance thresholds are in metres and boundary-inclusive: a measured distance equal to 1,000 metres qualifies.
+- Use spheroid-aware geography behavior by default. A faster spherical approximation requires measured justification, documented acceptable error, and tests before it can affect eligibility.
+- Use `ST_Distance` only when actual distance output/ranking is required; use `ST_DWithin` for threshold filtering so PostGIS can use spatial-index prefiltering.
+- Add deterministic non-distance tie-breakers when ranked results have equal/effectively equal distances.
+- Keep the route plus versioned threshold authoritative; do not persist a route-buffer polygon unless a demonstrated query, audit, or display requirement justifies it.
+
+**Pilot geofence**
+
+- Store every approved pilot boundary as an immutable, versioned MultiPolygon with status/effective interval, provenance, approval metadata, and audit history.
+- Validate geometry type, SRID, non-empty content, and `ST_IsValid` before activation. Do not silently repair an invalid approved boundary; reject it and require an explicit corrected version.
+- Use boundary-inclusive `ST_Covers(active_geofence_geometry, point_geometry)` for point eligibility where the product rule requires geofence membership.
+- Persist/reference the geofence version and relevant rule version used for consequential eligibility/matching evidence so later boundary updates do not rewrite historical decisions.
+- Define deterministic behavior for overlapping effective versions and prohibit ambiguous simultaneous active versions for the same scope.
+
+**Location evidence and uncertainty**
+
+- Store the point separately from server receipt time, device-recorded time, reported horizontal accuracy, source/purpose, related account/transaction/workflow event, applicable geofence/rule version, and provenance/integrity metadata.
+- Treat device GPS, provider routes, and EXIF coordinates as evidence with uncertainty, not guaranteed truth.
+- Exact acceptable accuracy, freshness, sampling, spoof/anomaly handling, and missing-location behavior require Android field testing and explicit product approval before affecting financial or fault outcomes.
+- Preserve original observations; corrected/derived spatial interpretations use linked records rather than overwriting evidence.
+
+**Testing**
+
+- Test exact-threshold and near-threshold route distances; geofence interior, exterior, boundary, and holes; invalid/self-intersecting polygons; empty/malformed routes; coordinate-order mistakes; antimeridian/pole behavior as defensive validation even though outside the pilot; reported accuracy/freshness boundaries; and spatial index/query-plan use.
+- Use real PostgreSQL/PostGIS integration tests for authoritative spatial behavior rather than substituting Python geometry calculations.
+
+A projected CRS such as the local UTM zone may be used transiently for a specialized calculation after validation, but it is not canonical persisted state under this decision.
+
+### Rationale
+
+- Geography predicates express approved thresholds directly in metres over WGS 84 coordinates.
+- EPSG:4326 aligns with mobile location APIs, map providers, and GeoJSON.
+- Geometry is well suited to geofence validity, versioning, and boundary-inclusive containment.
+- `ST_DWithin` with GiST indexing avoids loading candidates and calculating distances in Python.
+- Immutable geofence/rule versions preserve historical auditability.
+- Explicit accuracy/provenance prevents false precision in location evidence.
+
+### Alternatives Considered
+
+- **Projected local CRS as canonical:** Not selected because external boundaries use longitude/latitude and constant transformations increase coordinate-mixing risk without an MVP need.
+- **Store both WGS 84 and projected copies everywhere:** Rejected because duplicate authoritative representations can drift and require unnecessary indexes/synchronization.
+- **Plain latitude/longitude numeric columns with Python/manual distance:** Rejected because degree arithmetic is not metre distance, bypasses PostGIS spatial indexing, and risks inconsistent implementations.
+- **Persist pre-buffered route corridors as authority:** Not selected because threshold/version changes and derived-polygon integrity would add unnecessary state; `ST_DWithin` expresses the rule directly.
+- **Use `ST_Contains` for geofence eligibility:** Not selected because points exactly on a polygon boundary are excluded; the approved semantic is boundary-inclusive through `ST_Covers`.
+
+### Consequences
+
+**Benefits**
+
+- One external/canonical CRS and explicit coordinate order.
+- Correct metre-based distance semantics.
+- Indexed route matching and clear geofence boundaries.
+- Versioned, auditable spatial decisions.
+- Realistic handling of device-location uncertainty.
+
+**Costs and constraints**
+
+- Contributors must understand geometry versus geography semantics.
+- Geometry/geography conversion must be explicit in mixed containment queries.
+- Spatial migrations, indexes, and query plans require PostGIS-aware review/testing.
+- Product decisions for GPS accuracy/freshness and provider-route quality remain outstanding.
+
+### Revisit Triggers
+
+Review this decision if Kirim expands far beyond the pilot and geography performance becomes inadequate; advanced local geometric operations require a stable projected representation; route-provider data cannot be normalized safely; or measured accuracy requirements demand a different model. Any canonical CRS/type change requires data migration, API compatibility, historical-decision preservation, and spatial regression tests.
+
+### References
+
+- PostGIS geography data management: https://postgis.net/docs/using_postgis_dbmanagement.html
+- PostGIS `ST_DWithin`: https://postgis.net/docs/ST_DWithin.html
+- PostGIS `ST_Covers`: https://postgis.net/docs/ST_Covers.html
+- PostGIS `ST_IsValid`: https://postgis.net/docs/ST_IsValid.html
+
+### Affected Areas
+
+- `docs/TECH_STACK.md`
+- `docs/DATABASE_SCHEMA.md`
+- `docs/API_CONTRACTS.md`
+- Journeys and Matching module
+- Evidence and Files module
+- PostgreSQL/PostGIS migrations and indexes
+- Flutter/map-provider coordinate handling
+- Spatial integration, boundary, and query-plan tests

@@ -25,6 +25,8 @@
 - Date/time format: ISO 8601 UTC (confirm)
 - Identifier format: TBD
 - Null/omitted-field semantics: TBD
+- Coordinates: EPSG:4326; GeoJSON/array order is always `[longitude, latitude]`; reject invalid ranges or ambiguous/reversed input (`DECISIONS.md`, DEC-028).
+- Distances: expose documented metre values/thresholds derived through authoritative PostGIS geography operations; clients do not determine eligibility using local degree calculations.
 
 ### Errors
 
@@ -67,6 +69,16 @@ The example hostname and resource paths are placeholders, not approved endpoint 
 - Download operations reauthorize current relationship/case assignment and return safe media/disposition/sniffing headers. Storage keys are never authorization capabilities.
 - Support/Admin evidence reads are case-scoped and audited.
 - OpenAPI contracts describe metadata/state operations; binary streaming behavior and client cancellation/retry tests must also be documented explicitly.
+
+### In-App Messaging
+
+- Create and retrieve authoritative messages through REST endpoints; exact resource names remain TBD (`DECISIONS.md`, DEC-027).
+- Message creation requires a client-generated idempotency identifier and current conversation authorization.
+- Responses use server identifiers, receipt timestamps, and deterministic per-conversation ordering; client timestamps do not establish canonical order.
+- Catch-up uses opaque cursors. Clients must tolerate duplicate responses/notifications and synchronize after reconnect, resume, push, or cursor gaps.
+- Android push is a minimal, non-sensitive synchronization hint only. It is not the message, proof of delivery/read, or authorization.
+- Support/Admin message access is case-scoped and audited. Permitted attachments reference evidence handled under DEC-026 rather than using a separate chat-upload path.
+- Polling intervals, page limits, acknowledgement/read-state contracts, and moderation/redaction operations remain TBD and must not be invented from this transport decision.
 
 ## 3. REST Operation Template
 
