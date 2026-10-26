@@ -80,6 +80,15 @@ The example hostname and resource paths are placeholders, not approved endpoint 
 - Support/Admin message access is case-scoped and audited. Permitted attachments reference evidence handled under DEC-026 rather than using a separate chat-upload path.
 - Polling intervals, page limits, acknowledgement/read-state contracts, and moderation/redaction operations remain TBD and must not be invented from this transport decision.
 
+### Location and Live Sharing
+
+- Matching and event-evidence operations accept approved foreground/manual locations with explicit purpose and DEC-028 coordinate semantics (`DECISIONS.md`, DEC-035).
+- Location samples include server receipt time, device-recorded time, reported horizontal accuracy, source/permission precision, transaction/workflow purpose, and idempotency/sequence metadata as applicable.
+- Active live-sharing operations require current transaction authorization and explicit session lifecycle; exact start/stop/sample/batch resources remain TBD.
+- APIs tolerate duplicate, delayed, and out-of-order samples and do not treat missing data as automatic user fault.
+- The server validates state, freshness, plausibility, retention, and current sharing authorization; client permission/service state never establishes workflow truth.
+- Precise coordinates never appear in push payloads, problem details, ordinary logs, or disclosure-unsafe responses.
+
 ## 3. REST Operation Template
 
 ### `[METHOD] /resource`

@@ -69,9 +69,9 @@ Use this file as a reminder of the major decisions required to build Kirim with 
 - [x] **DEC-030:** `go_router` with manual routes, verified HTTPS Android App Links, allowlisted targets, and Riverpod-backed bootstrap/auth redirects.
 - [x] **DEC-031:** Dio plus a pinned generated OpenAPI `dart-dio` transport package behind repositories, subject to a mandatory compatibility spike.
 - [x] **DEC-032:** Provider SDK-managed mobile refresh session, transient access tokens where practical, and narrowly scoped Keystore-backed fallback with credentials excluded from backup.
-- [ ] Local persistence and offline behavior.
-- [ ] Maps and route-display integration.
-- [ ] Location and background-location implementation.
+- [x] **DEC-033:** Online-first Flutter client with in-memory server state, minimal non-sensitive preferences, controlled temporary files, and no offline consequential-action queue.
+- [ ] **DEC-034 partial:** Provider-separated Flutter map/backend routing architecture approved; Google Maps is the leading candidate, but exact renderer/routing/geocoding vendor remains deferred pending licence/retention, quality, cost, privacy, and SDK verification.
+- [x] **DEC-035:** Foreground location for matching/evidence plus explicit active-transaction foreground-service sharing; no unrestricted background-location permission initially.
 - [ ] Camera, receipt, and evidence-upload implementation.
 - [ ] Push-notification integration.
 - [ ] Localization implementation.
@@ -174,6 +174,6 @@ Use this file as a reminder of the major decisions required to build Kirim with 
 
 ## Current Progress
 
-- Major accepted decision records: **32**.
-- Remaining planning decisions: approximately **25**, depending on how supporting tools are grouped.
-- Current next topic: **Flutter local persistence and offline behavior**.
+- Major accepted decision records: **35**.
+- Remaining planning decisions: approximately **23**, including final map/routing vendor selection.
+- Current next topic: **Flutter camera, receipt, and evidence-upload implementation**.

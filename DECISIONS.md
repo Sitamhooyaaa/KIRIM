@@ -3090,3 +3090,345 @@ Review this decision if the selected provider SDK does not protect/persist sessi
 - Identity-provider selection and compatibility spike
 - Logout, account compromise, local cache partitioning, and navigation
 - Security, upgrade, device-transfer, and integration tests
+
+---
+
+## DEC-033 — 2026-10-18 — Use an Online-First Flutter Client with Minimal Local Persistence
+
+- **Status:** Accepted
+- **Decision owner:** Product Owner
+
+### Context
+
+Kirim's mobile workflows include acceptance, negotiation, payments, substitutions, purchase completion, delivery confirmation, cancellation, disputes, messaging, evidence, and ratings. Offline mutation queues would need durable client-side ordering, idempotency, expiry, conflict resolution, and reconciliation against server state that may have changed while disconnected. Android background execution is not guaranteed, and cached messages, locations, financial/workflow records, or evidence expand privacy, retention, backup, and account-isolation obligations. The MVP has no approved offline-first requirement.
+
+### Decision
+
+**Authority and caching baseline**
+
+- Use an **online-first** Flutter client. The Kirim API/PostgreSQL state remains authoritative.
+- Keep fetched server state in Riverpod/application memory while the process lives as appropriate. After process death/restart, refetch account, authorization, active transaction, message, and workflow state rather than treating persisted client snapshots as authoritative.
+- Do not introduce a persistent structured domain/read cache initially.
+- Restored navigation, app resume, push handling, deep-link handling, and relevant foreground refresh trigger authoritative synchronization.
+
+**Online-only consequential actions**
+
+- Require an online server request and authoritative response/reconciliation for consequential operations, including request creation/acceptance/counter/final confirmation, payments, price/substitution decisions, purchase completion, messages, cancellation, handover/delivery, disputes/reports, evidence upload/finalization, and ratings.
+- Do not automatically queue these mutations for later offline replay.
+- Prevent the UI from presenting an offline action as accepted, reserved, paid, sent, uploaded, or completed.
+- If a request outcome is uncertain because the connection/response failed after transmission, retain the same in-memory operation/idempotency context where possible and reconcile server/provider state before permitting another attempt. Do not assume that a lost response means the operation failed.
+- If the process dies during an uncertain consequential operation, recover through authoritative status/history endpoints and server idempotency rather than a generic client offline queue.
+
+**Permitted persistent state**
+
+- Persist only replaceable, non-critical, non-secret preferences explicitly approved for UX, such as display/theme/accessibility choices, dismissed educational prompts, or the last selected Customer/Shopper presentation mode.
+- Use simple preferences only for convenience data whose loss or delayed disk write cannot affect correctness. The exact preferences package/version is selected at scaffolding.
+- Do not store authentication credentials, payment details, authoritative workflow state, messages, evidence, precise location history, pending financial effects, or correctness-critical idempotency state in ordinary preferences.
+- Keep credential storage under DEC-032 and do not conflate it with general local persistence.
+
+**Temporary files and sensitive views**
+
+- Use app-private temporary storage only when required to stage a user-selected/captured evidence file or bounded processing artifact.
+- Delete temporary objects after successful upload/processing handoff, cancellation, expiry, logout/account compromise, or periodic cleanup. Make cleanup idempotent and resilient to crashes.
+- Do not automatically export evidence to shared gallery/download locations.
+- Do not persist authorized downloaded evidence beyond the active viewing/processing need unless a separate cache decision defines encryption, retention, deletion, and audit implications.
+- Exclude sensitive temporary/cache areas from backup where platform/provider behavior requires explicit rules.
+
+**Offline/unreachable UX**
+
+- Distinguish network/timeout/unreachable conditions from validation, authentication, authorization, conflict/precondition, rate-limit, server, and permanent failures.
+- Preserve form input in memory while the process remains alive where practical, show a clear unreachable/offline state, and offer an explicit safe retry when appropriate.
+- Disable or defer submission without claiming acceptance when required server connectivity is unavailable.
+- Connectivity-type signals may improve UI hints but never prove Kirim API reachability. Attempt bounded requests and handle their actual results.
+- Do not implement background synchronization of consequential writes under this decision.
+
+**Isolation, cleanup, and privacy**
+
+- Namespace/partition any permitted preferences or temporary state by environment and account when relevant; never show one account's state after another account authenticates.
+- Clear account-sensitive memory, temporary files, and any later approved caches on logout, account change, suspension/security hold handling, and deletion flows as applicable.
+- Do not log locally held form contents, message/evidence data, tokens, precise location, or payment information.
+
+**Future persistent read cache**
+
+- A persistent read cache requires a new decision backed by pilot evidence. It must define allowed record types, encryption, maximum age/stale presentation, schema migrations, account/environment partitioning, logout/deletion/retention cleanup, backup behavior, synchronization, storage limits, and whether messages/evidence/location are prohibited.
+- Full offline writes require separate product requirements and conflict/idempotency/reconciliation design; they are not an incremental implementation detail.
+
+### Rationale
+
+- Online-only consequential writes protect against stale transitions and duplicate financial/workflow effects.
+- Minimal persistence reduces privacy, retention, migration, deletion, and account-crossing risk.
+- Server idempotency/reconciliation is more reliable than a generic device-side mutation queue.
+- The pilot can measure actual connectivity pain before adding a local database and synchronization subsystem.
+- In-memory state and explicit unreachable UX provide a coherent MVP without pretending offline completion.
+
+### Alternatives Considered
+
+- **Persistent read cache with online-only writes:** Deferred because it adds schema/invalidation/privacy/cleanup complexity before pilot evidence shows a need.
+- **Full offline-first action synchronization:** Rejected for MVP because consequential workflows require conflict, expiry, ordering, provider, and idempotency semantics that are not approved.
+- **Full local replica:** Rejected because it duplicates the backend authority and greatly expands synchronization/security complexity.
+- **Store server responses in simple preferences:** Rejected because preferences are not intended for critical/durable structured records and would make invalidation/privacy behavior unclear.
+- **Rely on connectivity status before sending:** Rejected because connection type does not guarantee internet or API reachability.
+
+### Consequences
+
+**Benefits**
+
+- Simple and safe initial mobile data model.
+- No client-side workflow conflict engine.
+- Smaller sensitive-data and deletion surface.
+- Straightforward server-authoritative recovery after restart.
+
+**Costs and constraints**
+
+- Limited functionality during poor/no connectivity.
+- Previously viewed data may be unavailable after process death until reconnection.
+- Unsaved forms may be lost if Android terminates the process.
+- Future persistent caching will require a deliberate migration/design.
+
+### Revisit Triggers
+
+Review this decision if pilot evidence shows frequent connectivity loss materially prevents task completion; users need safe offline viewing of specific records; process termination causes unacceptable repeated work; or operational requirements demand a bounded persistent cache. Do not add offline financial/workflow mutations without explicit approved requirements and end-to-end reconciliation tests.
+
+### References
+
+- Flutter offline-first architecture: https://docs.flutter.dev/app-architecture/design-patterns/offline-first
+- Flutter data layer guidance: https://docs.flutter.dev/app-architecture/case-study/data-layer
+- `shared_preferences` package warning for critical data: https://pub.dev/packages/shared_preferences
+
+### Affected Areas
+
+- `docs/TECH_STACK.md`
+- Flutter repositories, Riverpod state, preferences, and temporary-file adapters
+- Workflow, payments, messaging, evidence, and retry UX
+- Logout/account switching, backup, deletion, and privacy behavior
+- Mobile integration and connectivity testing
+
+---
+
+## DEC-034 — 2026-10-18 — Separate Mobile Map Display from Backend Routing and Defer the Vendor
+
+- **Status:** Accepted
+- **Decision owner:** Product Owner
+
+### Context
+
+Kirim needs map display, route planning, the authoritative journey `LineString` used for the 1 km matching corridor, and historical evidence/audit behavior. Google Maps is the Product Owner's leading preference and has strong Malaysia coverage and Flutter/Android support. However, external-provider terms govern whether route geometry may be stored, reused for marketplace matching, displayed, and retained for disputes/audit. Current public Google Maps Platform terms appear to permit limited temporary caching of certain latitude/longitude values but do not clearly grant Kirim's required retention/reuse of complete Routes API polylines. Mapbox documentation likewise does not establish the needed permanent-storage right clearly. Selecting a vendor before resolving this would risk a conflict between product requirements and provider licence terms.
+
+### Decision
+
+**Architecture boundary**
+
+- Separate **mobile map rendering/interaction** from **server-side route computation/normalization** behind provider-specific adapters.
+- Flutter uses a map-display adapter owned by the maps feature/platform boundary. UI/application/domain code does not depend directly on provider SDK types.
+- The Kirim backend calls the approved routing provider through a server-side adapter, validates the result, and normalizes legally retainable authoritative route geometry to DEC-028's EPSG:4326 `geography(LineString, 4326)` model.
+- PostgreSQL/PostGIS, not the mobile SDK/provider response object, is the source used for Kirim route matching and historical rule evaluation, subject to the selected provider's permitted storage/reuse terms.
+- Flutter may propose origin, destination, waypoints, and user choices but cannot declare arbitrary client geometry authoritative. The backend recomputes or validates the route under the approved provider/rule version.
+- Persist provider/routing profile, request-input provenance, normalized geometry provenance, calculation time, applicable terms/data version where available, and route/rule version sufficient for support/audit without retaining prohibited provider content.
+
+**Vendor status**
+
+- Defer final map-renderer, tile/style, geocoding/place-search, and routing-provider selection until a focused technical, commercial, privacy, and licence spike is complete.
+- Treat **Google Maps as the leading map-display and integrated-provider candidate**, not an approved production provider.
+- Do not implement Google Routes API, Mapbox Directions, or another provider as authoritative until written terms/official documentation or provider clarification confirms Kirim's intended route storage, matching, display, retention, and audit use.
+- If an integrated provider cannot permit authoritative route retention, evaluate a legally compatible managed MapLibre/OSM-based tile/routing combination or separate map-display/routing providers. Verify that combining route content with a renderer is permitted by both providers.
+- Self-hosted map tiles/routing are not the initial preference and require a separate decision if managed providers cannot meet requirements.
+
+**Mandatory spike criteria**
+
+Evaluate Google, Mapbox, and at least one managed MapLibre/OSM-based combination for:
+
+- Kuala Lumpur driving and walking route quality/latency and required transport profiles;
+- right to retain normalized route geometry for active matching and approved historical retention;
+- right to use route geometry for a route-based marketplace/matching feature;
+- renderer/content-combination restrictions and attribution;
+- pricing, free usage, quotas, abuse controls, and billing alerts;
+- Flutter SDK maintenance and supported Android/device/rendering behavior;
+- mobile key restrictions by package/signing certificate/API and server credential restrictions;
+- geocoding/place-search needs and retention rules;
+- privacy/data-processing/region implications and Malaysia coverage;
+- outage, timeout, retry, fallback, and provider-change behavior;
+- PostGIS normalization, precision, determinism, and route-version auditability.
+
+Document source links, date reviewed, applicable account/agreement, unresolved legal interpretation, and provider responses. Ambiguous material rights require written clarification or legal review rather than optimistic implementation.
+
+**Credential and security rules**
+
+- Any mobile map token/key must be a provider-approved public-client credential restricted by Android package/application ID, signing certificate, environment, and API scope where supported. It is not treated as a secret.
+- Routing/geocoding credentials intended for server use remain in backend secret management and are never shipped in Flutter.
+- Apply quotas, monitoring, anomaly detection, and billing limits where providers support them.
+- Do not log unrestricted provider URLs/keys or unnecessary precise origin/destination data.
+
+**Display and fallback rules**
+
+- Attribution and legal notices remain visible as required and are included in UI acceptance/accessibility review.
+- The app displays the server-approved route/provenance state and refreshes if it becomes stale; client rendering never changes matching eligibility.
+- Define safe unavailable/degraded behavior. Do not fabricate a route or silently substitute straight-line geometry when authoritative routing fails.
+- Exact map interaction, route alternatives, waypoint editing, geocoding, camera bounds, and offline-map behavior remain product/vendor decisions.
+
+### Rationale
+
+- The boundary preserves Kirim control of matching semantics and PostGIS normalization while allowing managed map services.
+- Deferral prevents an external licence from silently invalidating route retention and audit requirements.
+- Google remains a credible leading candidate without being treated as approved before terms, cost, and route-quality verification.
+- Server-side routing protects credentials, centralizes provider policy, and prevents arbitrary client route authority.
+- Provider adapters reduce—not eliminate—future migration cost.
+
+### Alternatives Considered
+
+- **Approve Google Maps SDK and Routes API immediately:** Deferred because route-polyline storage/reuse rights are not sufficiently clear for Kirim's matching/audit requirements.
+- **Approve Mapbox immediately:** Deferred for the same unresolved route-geometry storage/terms question and required commercial testing.
+- **Approve MapLibre plus unspecified public OSM services:** Rejected because MapLibre is a renderer, not a production tile/routing service, and public OSM tile infrastructure cannot be assumed as Kirim's backend.
+- **Self-host tiles and routing now:** Not selected because operational/data-update burden is disproportionate to the pilot before managed-provider feasibility is exhausted.
+- **Compute routes directly from Flutter:** Rejected because it exposes provider controls, weakens authoritative normalization/audit, and permits client tampering.
+- **Use straight lines as routes:** Rejected because they do not represent road/walking paths and would undermine the 1 km matching rule.
+
+### Consequences
+
+**Benefits**
+
+- Avoids premature vendor/legal lock-in.
+- Preserves a Google-first evaluation path.
+- Keeps authoritative routing and matching on the backend.
+- Makes provider credentials, normalization, and audit responsibilities explicit.
+
+**Costs and constraints**
+
+- Vendor/package implementation remains blocked until the spike is completed.
+- Provider abstraction and normalized route mapping require deliberate interfaces/tests.
+- A legally compatible combination may be more complex or costly than one integrated vendor.
+- Written provider/legal clarification may be needed before Stage A/B route implementation.
+
+### Revisit Triggers
+
+Revisit at the map/routing provider selection gate, and whenever provider terms, pricing, SDK support, route coverage, retention requirements, or Kirim geography materially change. Approving Google or another vendor requires a new decision containing the verified agreement/terms date, products/SKUs, credentials, cost controls, data retention, attribution, fallback, and migration implications.
+
+### References
+
+- Google Maps Platform coverage: https://developers.google.com/maps/coverage
+- Google Routes API policies: https://developers.google.com/maps/documentation/routes/policies
+- Google Maps Platform service terms: https://cloud.google.com/maps-platform/terms/maps-service-terms
+- Google Maps Flutter plugin: https://pub.dev/packages/google_maps_flutter
+- Mapbox Directions API: https://docs.mapbox.com/api/navigation/directions/
+- MapLibre Flutter: https://maplibre.org/flutter-maplibre-gl/
+
+### Affected Areas
+
+- `docs/TECH_STACK.md`
+- Flutter maps feature/platform adapter
+- Backend routing-provider adapter
+- Journeys and Matching module and PostGIS route schema
+- Provider procurement, privacy, terms, credentials, billing, and observability
+- Route quality, normalization, retention, and migration tests
+
+---
+
+## DEC-035 — 2026-10-18 — Use Foreground Location and Explicit Active-Transaction Foreground-Service Sharing
+
+- **Status:** Accepted
+- **Decision owner:** Product Owner
+
+### Context
+
+Kirim needs a Customer location or manual point for route matching, bounded location/time evidence at approved shopping/delivery events, and optional consent-based live sharing during an active transaction. It does not require unrestricted all-day tracking. Android distinguishes while-in-use location, a visible location foreground service, and `ACCESS_BACKGROUND_LOCATION`; the latter has greater privacy impact and Google Play policy/declaration burden. A user-started location foreground service can continue while the app is not visible, with a persistent notification, when started under Android's permitted foreground conditions.
+
+### Decision
+
+**Permission baseline**
+
+- Use Android foreground/while-in-use location permission for normal matching, map interaction, and event evidence.
+- Request coarse and fine location together at the point a feature genuinely needs location, allowing the Android user to grant approximate rather than precise access.
+- Explain the immediate feature purpose before requesting permission. Do not request location during onboarding solely for future convenience.
+- Do **not** declare or request `ACCESS_BACKGROUND_LOCATION` for the MVP.
+- Preserve the approved manual-location alternative for Customer matching and other flows where requirements permit it.
+- If approximate location is insufficient for a particular matching/evidence operation, explain that limitation and offer manual/permission remediation; never silently label approximate data as precise.
+
+**Feature scope**
+
+- Customer matching uses a bounded current foreground location after explicit user action/permission or an approved manually selected point. Matching activation does not start continuous Customer tracking.
+- A Shopper's published journey is planned route data. Publishing or activating a journey does not itself start continuous device tracking.
+- Capture location/time evidence only for approved workflow purposes/events, such as price evidence, required arrival evidence, or other explicitly specified handover/delivery evidence.
+- The backend remains authoritative for freshness, accuracy, plausibility, workflow eligibility, and financial/support interpretation. The client does not declare evidence valid.
+
+**Optional active-transaction live sharing**
+
+- Implement live sharing only for an eligible active transaction and only after the sharing user takes an explicit informed action.
+- Start an Android `location` foreground service while the app is visible and platform preconditions are satisfied. Display an ongoing, clear notification for the complete sharing period and an in-app active indicator/stop control.
+- Share only with the currently authorized transaction counterpart; case-scoped Support access follows minimum-necessary authorization and audit rules.
+- Stop sampling/transmission promptly when the transaction becomes ineligible/closes, consent is withdrawn, the user logs out, account/security state prohibits it, permission/location services are revoked, or an approved bounded safety timeout expires.
+- Do not silently restart sharing after reboot, force-stop, app reinstall, account change, or service/process loss. The user must be informed when sharing is no longer active and explicitly restart when eligible.
+- Live sharing is operational assistance/evidence, not a guaranteed continuous service. Missing samples do not automatically establish fault, delivery failure, or fraud.
+
+**Sampling, transmission, and evidence**
+
+- Use bounded time/distance/accuracy settings determined through Android field testing; do not default to maximum-rate GPS continuously.
+- Balance delivery usefulness with battery, thermal, data, privacy, and managed-backend load.
+- Transmit through authenticated, authorized operations with idempotent/batched semantics as appropriate; tolerate duplicates, delayed/out-of-order samples, reconnects, and partial intervals.
+- Record server receipt time, device-recorded time, coordinates, reported horizontal accuracy, permission precision/source, transaction/workflow purpose, and applicable rule/version metadata under DEC-028.
+- Treat device/provider timestamps and coordinates as evidence with uncertainty. Detect/flag stale, duplicate, impossible, or severely inaccurate samples server-side without claiming perfect spoof detection.
+- Do not place precise location in push payloads, ordinary application logs, analytics, crash reports, or public links.
+- Retain precise transaction-location evidence for the approved 30-day post-closure category unless a dispute or other approved hold/exception applies; stop live collection when the transaction ends.
+
+**Implementation boundary**
+
+- Hide location and foreground-service APIs behind a Flutter platform/location adapter integrated through Riverpod/repositories.
+- `geolocator` is the leading plugin candidate, not yet permanently selected, subject to supported Android, approximate/precise permission, Android 14+ service type/permission, notification lifecycle, background/resume, process/service loss, OEM battery restriction, accuracy, and battery testing.
+- Do not add a third-party tracking/analytics service merely to obtain location updates.
+- Exact sampling, accuracy/freshness thresholds, notification wording/icon/channel, service timeout, retry/batch behavior, and supported Android baseline remain later decisions/tests.
+
+**Testing and policy**
+
+- Test permission denied/one-time/approximate/precise/permanently denied, location disabled, foreground-service start restrictions, app background/resume, screen lock, process/service termination, force-stop, reboot, logout, transaction closure, account hold, network loss, duplicate/out-of-order updates, and OEM power-saving behavior.
+- If later distributed through Google Play, verify foreground-service declarations, data-safety disclosures, privacy policy, and current policy requirements. Adding background location requires a new decision and Play declaration/review evidence.
+
+### Rationale
+
+- Foreground/while-in-use access covers matching and event evidence with least privilege.
+- A visible foreground service supports active-delivery sharing while keeping collection apparent to the user.
+- Avoiding unrestricted background permission reduces privacy, policy, and device-setting burden.
+- Manual location maintains functionality when permission is declined where product rules allow it.
+- Server-side validation and explicit uncertainty avoid treating mobile GPS as infallible financial evidence.
+
+### Alternatives Considered
+
+- **Full `ACCESS_BACKGROUND_LOCATION`:** Not selected because Kirim has no approved need for invisible/general background access, and it adds privacy and Play policy burden.
+- **Visible-screen-only updates:** Not selected because live sharing would stop whenever the user switches apps or locks the screen during delivery coordination.
+- **Third-party tracking SDK:** Not selected because it introduces another sensitive-location processor and dependency without a demonstrated need.
+- **Continuous tracking whenever a journey is active:** Rejected because a planned journey does not justify collecting actual movement before an accepted active transaction.
+- **Treat missing location as fault:** Rejected because permissions, device state, network, power management, and service loss can interrupt legitimate collection.
+
+### Consequences
+
+**Benefits**
+
+- Least-privilege location model with useful active-delivery sharing.
+- Clear user visibility and control through notification and in-app state.
+- Lower background-location policy and privacy risk.
+- Bounded, purpose-linked evidence compatible with retention rules.
+
+**Costs and constraints**
+
+- Foreground-service lifecycle and OEM behavior require substantial device testing.
+- Sharing cannot be guaranteed after force-stop/reboot/process loss.
+- Persistent notification is mandatory while sharing.
+- Exact sampling settings cannot be selected without field measurements.
+
+### Revisit Triggers
+
+Review this decision if pilot evidence shows foreground-service sharing cannot meet an approved core safety/delivery need; Android platform/policy behavior changes; a required feature must start location from the background; or Play distribution requires additional declarations. `ACCESS_BACKGROUND_LOCATION` requires a superseding decision with necessity analysis, prominent disclosure, permission UX, privacy impact, retention, Play review, and supported-device testing.
+
+### References
+
+- Android location permissions: https://developer.android.com/develop/sensors-and-location/location/permissions
+- Android foreground-service location requirements: https://developer.android.com/about/versions/14/changes/fgs-types-required
+- Android foreground-service background-start restrictions: https://developer.android.com/develop/background-work/services/fgs/restrictions-bg-start
+- Google Play background-location policy: https://support.google.com/googleplay/android-developer/answer/9799150
+- `geolocator` documentation: https://pub.dev/packages/geolocator
+
+### Affected Areas
+
+- `docs/TECH_STACK.md`
+- Flutter matching, delivery, evidence, and location adapters
+- Android manifest, permissions, foreground service, and notification channel
+- Backend live-location/evidence APIs and PostGIS schema
+- Privacy disclosures, retention/deletion, support audit, and Play policy
+- Android field, battery, lifecycle, and integration testing
