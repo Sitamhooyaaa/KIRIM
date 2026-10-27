@@ -3432,3 +3432,602 @@ Review this decision if pilot evidence shows foreground-service sharing cannot m
 - Backend live-location/evidence APIs and PostGIS schema
 - Privacy disclosures, retention/deletion, support audit, and Play policy
 - Android field, battery, lifecycle, and integration testing
+
+---
+
+## DEC-036 — 2026-10-18 — Use System Camera and Photo Picker Through image_picker for MVP Evidence
+
+- **Status:** Accepted
+- **Decision owner:** Product Owner
+
+### Context
+
+Kirim needs readable receipt, price/location, arrival, handover, dispute, and safety evidence. The MVP does not require a custom camera, automatic document scanning, OCR, or barcode recognition, and those capabilities would add lifecycle, device, image-processing, confidence, and reconciliation complexity. Android's system camera and Photo Picker already provide bounded capture/selection, while Flutter's official `image_picker` plugin supports both and documents process-loss recovery. Evidence authenticity still depends on server/workflow context and reconciliation; a custom camera cannot prove that a photographed receipt or scene is genuine.
+
+### Decision
+
+**Capture implementation**
+
+- Use the official Flutter **`image_picker`** plugin behind a Kirim evidence-capture adapter for MVP image capture/selection.
+- Use the system camera as the primary action for current receipt/arrival/handover evidence.
+- Permit Android Photo Picker selection only for evidence purposes explicitly allowed by the product flow. Use the system picker rather than broad media-library access where supported.
+- Record capture-source metadata such as camera versus picker for provenance/UX, but never treat it as proof of authenticity.
+- Do not implement background/hidden camera capture.
+
+**Original and preview**
+
+- Treat the exact file bytes selected/captured and submitted to Kirim as that evidence record's original.
+- Copy the picker result to controlled app-private temporary storage only when required for review/upload/recovery. Do not automatically save it to a shared gallery/download directory.
+- Do not silently crop, filter, annotate, rotate destructively, recompress, redact, or overwrite the submitted original.
+- Show a bounded preview and require explicit confirmation before upload; allow retake/reselection when unreadable.
+- Avoid decoding full-resolution images solely for preview. Use bounded thumbnails/display decoding while retaining the original file for upload.
+- If a source exceeds approved limits, provide clear recapture/reselection guidance rather than silently replacing the evidentiary original with a transformed file.
+
+**Android process-loss recovery**
+
+- Call `ImagePicker.retrieveLostData()` during appropriate app bootstrap/resume recovery because Android may kill the activity while the external picker/camera activity is open.
+- Present recovered files for user review; do not automatically upload or attach them.
+- Deduplicate the normal callback and lost-data recovery paths and ensure a recovered file cannot be attached to the wrong account, environment, transaction, or evidence purpose.
+- Clean unclaimed/rejected/expired temporary files through bounded idempotent cleanup.
+
+**Upload integration**
+
+- Upload only after current authentication, resource/workflow authorization, evidence-purpose validation, and user confirmation.
+- Use DEC-031 Dio multipart streaming/progress/cancellation and DEC-026 backend-proxy/quarantine processing.
+- Generate/preserve one idempotency key for the intended upload. Separate client byte-transfer completion from server processing/acceptance state.
+- If the response is uncertain, query/reconcile evidence-upload status before repeating the same operation.
+- Do not automatically queue evidence uploads offline under DEC-033. Retain a temporary file only for the bounded active retry/reconciliation window, then delete it.
+- Client checks provide early feedback only; server signature/format/decode/malware/size/dimension and authorization validation remain authoritative.
+
+**Deferred capabilities**
+
+- Defer custom in-app camera UI, document scanning/edge detection, automatic cropping/cleanup, OCR, barcode scanning, shelf-label scanning, and automated receipt-field extraction until requirements and pilot evidence justify them.
+- Any future OCR/scanning is assistive: users confirm consequential prices/quantities/totals, the immutable receipt remains authoritative evidence, and financial/workflow progression never relies solely on OCR output.
+- Reconsider a custom camera if measured unreadable-evidence rate, retake frequency, capture time, orientation/lighting failures, accessibility, or device behavior shows that system capture is inadequate.
+
+**Testing**
+
+- Test supported Android devices/versions for camera availability, permission denial, Photo Picker, process death/lost recovery, orientation, app background/resume, low memory/storage, temporary-file cleanup, cancellation/network loss, duplicates, large/corrupt/unsupported images, long receipts, poor lighting, and accessible preview/retake/progress/error UX.
+- Exact allowed formats, file count, dimensions, byte limits, gallery eligibility by purpose, and retention of failed uploads remain explicit product/security implementation decisions.
+
+### Rationale
+
+- System capture minimizes camera lifecycle/device-specific implementation for the pilot.
+- The official plugin provides camera, privacy-preserving picker integration, and Android lost-result recovery.
+- Preview/retake solves the immediate readability need without mutating evidence.
+- A custom camera does not materially establish authenticity; server context, immutable storage, location/time evidence, reconciliation, and human review remain necessary.
+- Pilot metrics can identify whether document scanning or custom quality feedback is worth its complexity.
+
+### Alternatives Considered
+
+- **Custom in-app `camera` implementation:** Deferred because Kirim would own preview, focus/exposure, flash, orientation, permission, app lifecycle, controller, and manufacturer compatibility before a measured need exists.
+- **ML Kit Document Scanner:** Deferred because it adds Play-services/native-bridge considerations and processed image/PDF output before scanning UX is required.
+- **OCR-driven receipt workflow:** Deferred because generic OCR is not receipt-specific, can misread consequential values, and requires extraction/confidence/user-correction design.
+- **Camera-only with no picker:** Not mandated because capture source does not prove authenticity and an approved picker fallback may improve recovery/accessibility; exact purpose eligibility remains controlled.
+- **Automatic client compression/cropping:** Rejected as the default because it changes the submitted original and can remove useful evidence/detail.
+
+### Consequences
+
+**Benefits**
+
+- Small, maintainable MVP capture surface.
+- Uses Android system privacy/lifecycle behavior where practical.
+- Preserves original submitted evidence and supports explicit readability confirmation.
+- Clear upgrade path based on pilot evidence.
+
+**Costs and constraints**
+
+- No framing guides, blur/glare detection, edge detection, or automatic crop.
+- Capture UX varies by installed camera application/device.
+- Android process-loss and temporary-file handling still require careful implementation.
+- Users may need to retake long or poorly lit receipts manually.
+
+### Revisit Triggers
+
+Review this decision if pilot evidence shows unacceptable unreadable/incorrect orientation rates, repeated retakes, capture abandonment, support burden, long-receipt problems, accessibility failures, or a new approved scanning/OCR/barcode requirement. A custom camera/scanner change must preserve original-evidence semantics or explicitly redefine them with security/product approval.
+
+### References
+
+- Flutter `image_picker`: https://pub.dev/packages/image_picker
+- Flutter `camera`: https://pub.dev/packages/camera
+- ML Kit Document Scanner: https://developers.google.com/ml-kit/vision/doc-scanner
+- ML Kit Text Recognition: https://developers.google.com/ml-kit/vision/text-recognition/v2
+
+### Affected Areas
+
+- `docs/TECH_STACK.md`
+- Flutter Evidence and Files capture adapter/UI
+- Android picker/camera lifecycle and temporary-file handling
+- Evidence upload, processing, reconciliation, and cleanup
+- Android device, accessibility, and integration tests
+
+---
+
+## DEC-037 — 2026-10-18 — Use Direct Firebase Cloud Messaging for Android Push
+
+- **Status:** Accepted
+- **Decision owner:** Product Owner
+
+### Context
+
+Kirim needs timely Android awareness for negotiation deadlines, substitution approval, balance payment, messaging, handover, disputes, settlement, security, and support events. Push cannot be authoritative because delivery may be delayed, duplicated, reordered, expired, or omitted. Direct Firebase Cloud Messaging (FCM) is Android's native managed push path with official Flutter support. OneSignal would still rely on FCM while adding another processor and campaign platform that the invite-only transactional MVP does not require.
+
+### Decision
+
+**Provider and integration**
+
+- Use **Firebase Cloud Messaging directly** for Android push through the official FlutterFire `firebase_messaging` plugin.
+- Send from Kirim's trusted backend/Worker using the FCM HTTP v1 API. Never include server sending credentials in Flutter.
+- Hide FCM behind Kirim mobile and backend notification-provider adapters so domain events and routing policy do not depend directly on Firebase SDK/API types.
+- Do not add OneSignal, Firebase Analytics, marketing campaigns, or another push intermediary initially. Firebase Analytics or notification-performance analytics require a separate privacy/product decision.
+
+**Non-authoritative semantics**
+
+- Treat push as a best-effort synchronization/attention hint only. FCM acceptance/message ID is not proof of device delivery, display, opening, reading, or action completion.
+- Persist every important notification-triggering domain event/state in Kirim. On push receipt/tap, app resume, or foreground handling, authenticate, reauthorize, and fetch authoritative server state.
+- Tolerate missing, duplicated, delayed, expired, collapsed, and out-of-order messages. Push failure or success never changes workflow/payment state.
+- Do not perform confirmation, payment, cancellation, handover, dispute, or any consequential business action solely in a background handler.
+
+**Flutter lifecycle**
+
+- Register the FCM background handler as a top-level retained entry point according to current FlutterFire requirements and keep its work brief/bounded.
+- Handle foreground messages, `getInitialMessage()` for terminated launch, and notification-open events from background, mapping only allowlisted target types through DEC-030 navigation.
+- Do not assume UI/Riverpod state is available in the background isolate. Prefer marking/scheduling a safe synchronization need rather than loading/persisting sensitive domain data.
+- When already foregrounded, refresh relevant state and show an approved in-app indication; avoid duplicate system/in-app alerts. A separate local-notifications plugin is not selected initially.
+
+**Permission and user control**
+
+- On Android 13+, provide a contextual explanation and request notification permission when the user can understand the transactional benefit, not automatically on first launch.
+- Continue core app operation if permission is denied. Provide a respectful later path to Android settings without repeated coercive prompts.
+- Honor Kirim notification preferences/routing once defined, subject to legally/security-required communications. Exact event/channel matrix is a later decision.
+
+**Installation registration**
+
+- Maintain an authenticated server-side installation registration with a random Kirim installation ID, FCM registration token, account association, environment/application identity, platform, safe app version, creation/refresh timestamps, and invalid/stale/revoked state as needed.
+- Treat registration tokens as sensitive delivery identifiers, not identity, authentication, or authorization.
+- Support multiple legitimate installations per account. Prevent cross-environment and cross-account reassociation without authenticated registration.
+- Obtain the current token and process `onTokenRefresh`; upsert it idempotently. On logout/account change, unlink/delete the installation registration and request local FCM token deletion where the selected lifecycle permits, without claiming remote deletion succeeded if offline.
+- Remove confirmed unregistered/invalid tokens according to verified FCM error semantics and prune stale registrations using a documented policy.
+
+**Payload, privacy, and routing**
+
+- Payloads contain only an allowlisted event/target type, opaque resource/event identifiers, and minimal synchronization metadata.
+- Do not include message contents, requested items, prices/payment details, evidence/storage URLs, precise location, contact data, authentication material, or internal security/fraud reasoning.
+- Notification title/body shown on a lock screen are generic/minimized by default; per-event wording and privacy level require product/security review.
+- Never accept an arbitrary URL from a push payload. Map known types to known internal routes, then authenticate/authorize/fetch.
+- Do not log registration tokens or full sensitive payloads in ordinary logs, analytics, or crash reports.
+
+**Delivery controls**
+
+- Configure TTL, Android priority, collapse behavior, notification channel/importance, sound/vibration, and fallback per approved event category rather than globally.
+- Time-limited actions use a TTL no longer than their useful window; opening a stale notification always displays current server state rather than an obsolete action.
+- Collapse only replaceable latest-state hints. Preserve distinct awareness events where required.
+- Use high-priority delivery only for genuinely urgent user-visible transactional events and comply with current FCM/Android policy.
+- Provider errors and retries follow DEC-025. Delete invalid registrations; retry transient failures with bounded jittered policy; keep permanent failures visible according to event severity.
+
+**Credentials and environments**
+
+- Isolate development, staging, and production Firebase projects or credentials/configuration so test pushes cannot reach production installations.
+- Store HTTP v1 authorization/service credentials in approved backend secret management with least privilege, rotation, audit, and no repository/client inclusion.
+- Configure quotas, abuse monitoring, and billing/usage alerts where applicable.
+
+**Degraded behavior and testing**
+
+- REST polling/catch-up remains the fallback and source of truth. Email/SMS fallback occurs only through a later approved per-event routing matrix.
+- Test devices without available/functioning Google Play services and use the supported Android/device-baseline decision to determine scope and communicate degraded behavior.
+- Test Android permission states, token rotation/reinstall/data clear, multiple devices, logout/account change, foreground/background/terminated/force-stop behavior, duplicates/order/TTL/collapse, invalid tokens, offline periods, wrong-user targets, notification taps, and privacy-safe lock-screen content.
+
+Exact Firebase project structure, plugin/API versions, installation schema, event matrix, TTL/priority/channels, token staleness window, and fallback routing remain later configuration/decisions.
+
+### Rationale
+
+- Direct FCM is the standard managed Android delivery path with official Flutter support.
+- It avoids adding another processor while Kirim does not need marketing automation.
+- Server-authoritative synchronization handles push's inherent delivery uncertainty.
+- Installation registration and minimal payloads preserve authorization and privacy boundaries.
+- Provider adapters retain a future migration path and keep domain events independent of Firebase.
+
+### Alternatives Considered
+
+- **OneSignal:** Not selected because it still relies on FCM, adds another device/notification data processor, pricing/SDK dependency, and campaign capabilities not needed for the pilot.
+- **Polling only:** Rejected because short negotiation/payment/substitution windows need timely awareness, although polling remains fallback.
+- **SMS/email only:** Rejected as the sole frequent transactional channel due to latency/cost/UX; retained for approved verification/fallback categories.
+- **Push payload as authoritative event/data:** Rejected because FCM delivery/order is not guaranteed and lock-screen/device exposure is possible.
+- **FCM topics for private transaction events:** Rejected because account/transaction targeting belongs in Kirim's authorized installation mapping, not broad topic membership.
+
+### Consequences
+
+**Benefits**
+
+- Official Android/Flutter push path with minimal additional vendor layers.
+- Timely background awareness while preserving server authority.
+- Clear token lifecycle, privacy, and environment isolation.
+- Future provider replacement is bounded by adapters.
+
+**Costs and constraints**
+
+- Requires Firebase project, credentials, Android configuration, token storage/pruning, and lifecycle testing.
+- Devices without functioning Google Play services may lack push.
+- Notification permission denial and force-stop reduce delivery and require graceful fallback.
+- Event-specific channel/TTL/fallback policy remains to be designed.
+
+### Revisit Triggers
+
+Review this decision if supported target devices materially lack Google Play services; FCM reliability/policy/cost becomes unacceptable; iOS requires a broader cross-platform abstraction; or a managed notification platform provides approved operational value that outweighs privacy/dependency cost. Replacement must preserve server-authoritative events, minimal payloads, authenticated installation mapping, and catch-up.
+
+### References
+
+- Firebase Messaging for Flutter setup: https://firebase.google.com/docs/cloud-messaging/flutter/get-started
+- Firebase Messaging receive behavior: https://firebase.google.com/docs/cloud-messaging/flutter/receive-messages
+- FCM message types: https://firebase.google.com/docs/cloud-messaging/customize-messages/set-message-type
+- FCM registration management: https://firebase.google.com/docs/cloud-messaging/manage-tokens
+- FCM HTTP v1 sending: https://firebase.google.com/docs/cloud-messaging/send/v1-api
+
+### Affected Areas
+
+- `docs/TECH_STACK.md`
+- Flutter notification adapter, bootstrap, Riverpod refresh, and navigation
+- Backend Communication and Notifications module/Worker
+- Installation registration schema and APIs
+- Firebase projects, credentials, secrets, channels, quotas, and monitoring
+- Notification privacy, routing, retry, and Android lifecycle tests
+
+---
+
+## DEC-038 — 2026-10-18 — Use Flutter gen_l10n for English and Bahasa Malaysia
+
+- **Status:** Accepted
+- **Decision owner:** Product Owner
+
+### Context
+
+Kirim requirements mandate English and Bahasa Malaysia user-facing content, MYR currency, Malaysia business time, and unambiguous date/time presentation. Localization affects static UI, API/domain error mapping, deadlines, money, push/email/SMS templates, accessibility, and layout. Flutter provides an official ARB-based typed generator. Kirim does not currently require remote runtime translation delivery, and server-driven UI text would couple Flutter presentation to backend availability/contracts.
+
+### Decision
+
+**Flutter localization mechanism**
+
+- Use Flutter's official **`gen_l10n`** tool with ARB resources and generated typed localization accessors.
+- Maintain at minimum English (`en`) and Malay/Bahasa Malaysia (`ms`) resources. Use standard locale identifiers; do not invent `bm` as a locale code.
+- Use Malaysian regional locale data (`en_MY`/`ms_MY`) where formatting behavior requires region specificity while keeping supported language selection understandable.
+- Use the Flutter/Dart `intl` capabilities supplied through the approved localization stack for locale-aware message, number, currency, plural, select, and date formatting. Pin compatible versions at Flutter scaffolding.
+- Do not add a third-party localization framework or remote translation service initially.
+
+**Locale selection**
+
+- Follow the Android/device locale when it resolves to supported English or Malay.
+- Fall back to English for unsupported/missing locales.
+- Provide an in-app English/Bahasa Malaysia override and persist it only as non-sensitive convenience data under DEC-033.
+- Do not assume the preference synchronizes across devices/accounts unless a later requirement approves account-level language preference. Installation locale may be registered for privacy-minimized push rendering under DEC-037.
+
+**Resource and translation workflow**
+
+- Use stable semantic message keys, descriptions, typed placeholders, and ICU plural/select expressions. Do not use full English sentences as unstable identifiers.
+- Do not concatenate translated sentence fragments or assume English word order, plural rules, punctuation, or label length.
+- Maintain a bilingual product/domain terminology glossary, including Customer, Shopper, journey, request, fee, held/secured amount, balance, reimbursement, payout, dispute, evidence, and handover.
+- Require fluent human review for Bahasa Malaysia. Machine translation may assist drafting but is not final approval for financial, safety, legal, privacy, permission, authentication, dispute, or workflow copy.
+- Copy changes affecting consequential interpretation require product review in both languages.
+
+**API and dynamic content**
+
+- API/client behavior depends on stable problem/error codes and structured parameters, not English message text. Map known codes to local ARB messages.
+- Treat safe backend `detail` as fallback/support context rather than the primary localizable contract. Unknown failures show a generic localized message plus safe request/correlation ID.
+- Use stable validation field/code semantics so Flutter can localize errors; never show raw provider, SQL, stack, authentication, or internal fraud/security messages.
+- Do not automatically translate user-generated messages, item descriptions, reports, or evidence contents. Render submitted text safely and identify system-generated notices separately.
+- Server-configured/legal/support content that must be bilingual requires explicit versioned content fields/templates and fallback rules, not ad hoc client translation.
+
+**Money and time**
+
+- Format MYR using locale-aware number/currency formatting and make `RM`/`MYR` explicit wherever ambiguity could affect consent/payment understanding.
+- Never use localized formatted strings or binary floating point as authoritative monetary values; exact API/database representation remains a separate decision.
+- Store/transport timestamps as approved UTC ISO-8601 values. Interpret business deadlines/support hours using `Asia/Kuala_Lumpur` rather than an implicit device zone or hardcoded display assumption.
+- Use locale-aware, unambiguous display. Include explicit dates/zones/context where relative or numeric-only dates could mislead.
+- Countdown UI derives from authoritative server deadlines and compensates for observed server/device clock difference where designed; server state determines expiry.
+- Select and test the exact timezone package/data strategy at scaffolding because `intl` formatting alone does not establish authoritative IANA timezone conversion.
+
+**Notification and external templates**
+
+- Render FCM title/body from approved privacy-minimized English/Malay templates using the installation's last known locale; event type/resource ID remain language-neutral.
+- A stale/missing locale falls back safely, and opening a push fetches authoritative localized app state.
+- Email/SMS providers/templates must use the same glossary, parameter escaping, fallback, and human-review rules once selected.
+
+**Layout, accessibility, and testing**
+
+- Design layouts for text expansion, wrapping, dynamic text scaling, small supported screens, and screen readers. Do not shrink text below accessible sizes merely to fit an English-shaped layout.
+- CI validates ARB syntax, required key coverage, placeholder/type consistency, and current generated output.
+- Run critical workflow widget/golden/accessibility tests in both locales, including authentication, permissions, matching, negotiation timers, payments, substitutions, receipt/evidence, delivery, disputes, errors, and notifications.
+- Bilingual review must include financial amounts, deadlines, cancellation consequences, consent, and safety instructions on representative devices.
+
+Exact ARB paths/naming, glossary ownership, translation approval workflow/tooling, timezone package, push/email/SMS template storage, and screenshot/golden strategy remain implementation/process decisions.
+
+### Rationale
+
+- `gen_l10n` is official Flutter tooling with typed accessors and build-time validation.
+- ARB/ICU supports placeholders, plurals, and select semantics needed for both languages.
+- Local static resources make startup, offline errors, and permission screens independent of backend translation delivery.
+- Stable API codes preserve contract behavior while allowing localized human text to evolve.
+- Explicit Malaysia currency/time rules reduce consequential ambiguity.
+
+### Alternatives Considered
+
+- **Third-party package such as `easy_localization`:** Not selected because official tooling meets current requirements without another runtime abstraction/dependency.
+- **Server-driven UI translations:** Rejected for ordinary UI because it reduces type/build-time safety and couples screens/errors to backend availability/content versioning.
+- **Hardcoded strings:** Rejected because bilingual support is an explicit MVP requirement.
+- **Machine translation without human review:** Rejected for consequential copy due to financial, safety, legal, and trust risk.
+- **Use backend English `detail` as UI contract:** Rejected because clients must depend on stable codes and localized resources, not mutable prose.
+
+### Consequences
+
+**Benefits**
+
+- Typed, official, build-validated bilingual UI.
+- Clear separation between machine API codes and human presentation.
+- Consistent MYR/time/deadline terminology.
+- Accessibility/layout requirements considered from the start.
+
+**Costs and constraints**
+
+- Every UI/copy change requires two reviewed resources.
+- Human translation/review and glossary maintenance require process ownership.
+- Generated localization code and ARB checks enter the build.
+- Timezone handling still needs a separate verified implementation.
+
+### Revisit Triggers
+
+Review this decision if more languages, remote content updates, non-Flutter clients sharing one translation management workflow, or translation volume justify a localization platform. Any change must preserve typed/fallback behavior, human review of consequential copy, and stable API code mapping.
+
+### References
+
+- Flutter internationalization: https://docs.flutter.dev/ui/internationalization
+- Dart `intl`: https://pub.dev/packages/intl
+
+### Affected Areas
+
+- `docs/TECH_STACK.md`
+- Flutter ARB/generated localization and locale preference
+- API error/validation mapping
+- FCM, email, and SMS templates
+- Money, date/time, deadline, and support-hour presentation
+- Accessibility, widget/golden tests, glossary, and content review
+
+---
+
+## DEC-039 — 2026-10-18 — Use Material 3 with WCAG 2.2 AA and Android/Flutter Accessibility Gates
+
+- **Status:** Accepted
+- **Decision owner:** Product Owner
+
+### Context
+
+Kirim's Android application contains bilingual, timed, financial, map/location, messaging, camera/evidence, permission, safety, and dispute workflows. Standard Material widgets provide a useful baseline but do not guarantee correct semantics, focus order, contrast, text reflow, error announcements, or accessible custom maps/camera/status UI. WCAG 2.2 AA provides a practical recognized target, while Android/Flutter guidance supplies mobile-specific requirements such as 48 dp touch targets and TalkBack testing. Universal AAA compliance would be disproportionate and is not necessary to adopt useful AAA practices selectively.
+
+### Decision
+
+**Design foundation**
+
+- Base the Flutter UI on **Material 3** and a small Kirim semantic theme/token layer for color roles, typography, spacing, shape, elevation, focus, disabled, loading, success, warning, and error states.
+- Prefer standard Material controls when they meet product/accessibility requirements. Do not build a large custom design-system/component library before repeated needs exist.
+- Custom controls must expose equivalent semantics, role, state, action, focus, visual feedback, touch area, and keyboard/Switch Access behavior where applicable.
+- Target applicable **WCAG 2.2 Level AA** criteria plus current Android/Flutter accessibility guidance; use the stricter practical mobile requirement where standards differ.
+
+**Targets, contrast, and non-color communication**
+
+- Make interactive targets at least **48 × 48 logical pixels/dp**, including icon-button hit areas, and provide adequate separation for adjacent consequential actions.
+- Target at least 4.5:1 contrast for normal text, 3:1 for large text, and 3:1 for meaningful UI component/focus boundaries, subject to applicable standard definitions/exceptions.
+- Never communicate status, validation, urgency, route, selection, or financial consequence through color alone. Combine text, icon, shape/pattern, and semantics as appropriate.
+- Validate every implemented theme independently. This decision does not require dark mode, but any approved theme must meet the same criteria.
+
+**Text, localization, and layout**
+
+- Support Android font scaling to at least **200%** through critical workflows without loss of content or function.
+- Avoid fixed-height text containers and fragile absolute layouts; allow wrap, reflow, vertical growth, and scrolling.
+- Do not truncate or shrink consequential amounts, deadlines, consent text, errors, cancellation effects, safety instructions, or primary actions merely to fit.
+- Test English and Bahasa Malaysia together with large font/display scaling on small supported screens under DEC-038.
+
+**Semantics and assistive technology**
+
+- Provide concise meaningful labels, roles, values, states, hints only when useful, and available actions. Avoid duplicating visible text that standard widgets already expose.
+- Exclude decorative images from semantics and label icon-only controls by purpose/result rather than appearance.
+- Maintain logical reading/focus order and ensure all core actions are reachable without relying on visual position or gesture-only interaction.
+- Announce relevant dynamic changes such as validation failures, loading completion, upload/processing status, live-location sharing state, message/action availability, and consequential outcomes without creating excessive repeated announcements.
+- Require manual TalkBack testing for critical workflows; semantics-tree/automated checks do not replace it.
+
+**Forms, state, and consequential actions**
+
+- Give each input a persistent or programmatically associated label; placeholders alone are not labels.
+- Associate errors with fields, explain correction, preserve valid input, and move/announce focus appropriately after failed submission.
+- Use specific action labels that state consequential effects where practical rather than ambiguous generic labels.
+- Provide clear, accessible pending/success/failure/uncertain states; prevent duplicate submissions without trapping focus or hiding status.
+- Add confirmation where accidental activation can cause material financial/workflow/safety harm, while avoiding redundant confirmation for harmless actions.
+
+**Timed workflows**
+
+- Display authoritative server deadline/context and an accessible countdown for approved five-/ten-minute flows.
+- Provide non-disruptive warnings before expiry where practical; do not continuously announce every countdown tick.
+- Preserve user input through recoverable validation/network failures where possible.
+- The client cannot extend an authoritative business deadline. Document essential non-adjustable timing and, on expiry, fetch/show the resulting server state and available action.
+
+**Maps, location, camera, and evidence**
+
+- Provide textual alternatives/summaries for core map information such as origin, destination, approved route/deviation/distance, sharing state, and permission/accuracy state. Core transaction understanding must not require visual map interpretation.
+- Label live-location start/stop and foreground-sharing status clearly.
+- Provide accessible camera/picker instructions and controls for capture/select, preview, retake, remove, upload, cancel, progress, processing, rejection, and retry.
+- Do not rely solely on thumbnails, animation, haptics, or sound to communicate evidence state.
+
+**Motion and modality**
+
+- Respect reduced-motion/platform accessibility settings where available; avoid unnecessary flashing, parallax, rapid motion, or animation required to understand state.
+- Always provide a visible/semantic alternative to custom gestures.
+- Haptics/audio may supplement but do not replace text/visual/semantic feedback.
+- Modals, sheets, snackbars, and temporary messages must have correct focus, dismissal, duration, and accessible persistent alternatives for consequential information.
+
+**Quality gates**
+
+- Add Flutter widget accessibility guideline checks where applicable, including Android tap targets, labeled targets, text contrast, and semantics assertions.
+- Test large font/display scaling and both locales in critical widget/golden flows. Use golden tests selectively for stable layout/visual regressions, not as the only accessibility check.
+- Include Android Accessibility Scanner and manual TalkBack review on representative supported devices for authentication, permissions, matching/maps, negotiation timers, payments, substitutions, messaging, evidence, live location, delivery, cancellation, disputes, ratings, and error/recovery states.
+- Accessibility defects that block a critical workflow or obscure financial/safety consequences are release blockers unless an explicit owner-approved exception and remediation plan exists.
+
+Exact brand palette, typography, component catalogue, dark-theme scope, reduced-motion implementation, test-device matrix, and design-review tooling remain future design/scaffolding work.
+
+### Rationale
+
+- Material 3 supplies accessible native conventions and reduces unnecessary custom-widget risk.
+- WCAG 2.2 AA is a meaningful achievable baseline; Android/Flutter requirements address mobile-specific interaction.
+- 48 dp targets, contrast, scaling, semantics, and TalkBack are testable acceptance gates.
+- Explicit treatment of maps, timers, money, and evidence addresses Kirim's highest accessibility risks.
+- A small token layer supports consistency without premature design-system engineering.
+
+### Alternatives Considered
+
+- **Platform defaults without explicit gates:** Rejected because defaults cannot validate labels, custom controls, dynamic states, contrast, layout expansion, or end-to-end critical workflows.
+- **WCAG AAA everywhere:** Not selected as a universal MVP requirement because some criteria are disproportionate or not practical for every workflow; beneficial AAA practices may still be adopted selectively.
+- **Custom design system from scratch:** Rejected because it increases semantic/component maintenance before Kirim has established repeated patterns.
+- **Automated scanner only:** Rejected because automated tools cannot validate meaningful spoken UX, workflow comprehension, or all dynamic states.
+
+### Consequences
+
+**Benefits**
+
+- Consistent accessible visual and interaction baseline.
+- Bilingual and large-text resilience from the start.
+- Explicit release gates for critical financial/safety workflows.
+- Lower risk than extensive custom UI components.
+
+**Costs and constraints**
+
+- Design and implementation require ongoing accessibility review and device testing.
+- Custom maps/camera/timed state require additional semantics and alternatives.
+- Some layouts and copy will need iteration at 200% scaling in both languages.
+- Manual TalkBack testing adds release effort.
+
+### Revisit Triggers
+
+Review this decision if legal/market requirements demand a higher or different standard, iOS/web introduces platform-specific criteria, or user research identifies unmet assistive-technology needs. Changes may strengthen but must not silently weaken the approved AA/mobile baseline.
+
+### References
+
+- Flutter accessibility: https://docs.flutter.dev/ui/accessibility
+- Flutter accessibility testing: https://docs.flutter.dev/ui/accessibility/accessibility-testing
+- Android accessibility guidance: https://developer.android.com/guide/topics/ui/accessibility/apps
+- WCAG 2.2: https://www.w3.org/TR/WCAG22/
+
+### Affected Areas
+
+- `docs/TECH_STACK.md`
+- Flutter theme, components, semantics, forms, navigation, and feature UI
+- English/Bahasa Malaysia layout and copy
+- Maps, location, camera/evidence, notifications, and timed workflows
+- Widget/golden/integration testing and release quality gates
+
+---
+
+## DEC-040 — 2026-10-18 — Use Flutter Test Tools with Bounded Patrol Native-System Tests
+
+- **Status:** Accepted
+- **Decision owner:** Product Owner
+
+### Context
+
+Kirim's Flutter application requires pure logic, Riverpod state, widgets, bilingual/accessibility UI, API integration, and full journey testing. It also relies on Android system interactions—location/notification permissions, system camera, Photo Picker, notification shade, App Links, foreground-service notification, and app lifecycle—that Flutter's official `integration_test` cannot fully automate. Patrol extends Flutter testing with native-system automation while keeping tests in Dart, but adds CLI/native setup and potential flakiness, so it should be used selectively and only after compatibility verification.
+
+### Decision
+
+**Primary tools**
+
+- Use Flutter/Dart's official test stack as the foundation:
+  - Dart/Flutter unit tests and `flutter_test` for pure logic, Riverpod controllers/providers, and widgets;
+  - official `integration_test` for application flows that remain primarily within Flutter and supported plugin boundaries.
+- Add **Patrol** for a small critical suite of native Android/system interactions, subject to a mandatory compatibility/stability spike.
+- Do not adopt Maestro or Appium initially. Do not duplicate the whole Flutter suite in Patrol.
+- Pin Flutter test, Patrol package/CLI, Android Gradle, emulator/system image, and related versions through the project tooling/lock configuration after the spike.
+
+**Test layers**
+
+- Pure Dart unit tests cover value objects, mapping/formatting, API error categories, cursor/state reconciliation, deadlines/clock handling, idempotency lifecycle, and pure orchestration decisions.
+- Riverpod tests use fresh containers and provider overrides for loading/data/empty/validation/authorization/conflict/retry/permanent failure, cancellation/disposal, duplicate submission prevention, push/resume refresh, logout/reset, and uncertain-outcome reconciliation.
+- Prefer small deterministic handwritten fakes and injected clocks/IDs/adapters. Add a mocking package only where fakes become disproportionate; do not mock implementation details unnecessarily.
+- Widget tests cover screens/components, forms, navigation/redirect states, bilingual text, 200% scaling, errors/conflicts, consequential confirmations, messaging/evidence progress, and DEC-039 accessibility guidelines/semantics.
+- Use golden tests selectively for stable, high-risk visual states in a pinned environment. Goldens do not replace behavior, semantics, bilingual, or manual accessibility testing.
+- Official integration tests cover critical Flutter-managed flows against synthetic isolated test data/services, including auth/bootstrap, role switching, journey/request/negotiation, sandbox payment orchestration, messaging catch-up, evidence upload status, delivery/dispute refresh, and deep-route handling.
+
+**Patrol scope and gate**
+
+- Use Patrol only where native/system interaction is essential, such as location/notification permission variants, system camera capture, Android Photo Picker, notification shade/tap, verified deep-link launch, foreground-service notification, and selected app background/settings returns.
+- Before permanent adoption, verify selected Flutter/Android versions, Windows development, Linux CI, emulator and physical-device execution, permission dialogs across supported Android versions, camera/Photo Picker, FCM notifications, App Links, service notification, isolation/cleanup, runtime, diagnostics, and flakiness.
+- If Patrol fails the gate, use official integration tests plus bounded Android-native/manual tests; do not weaken required platform coverage or force an unstable tool.
+- Maintain stable semantic labels/identifiers for native automation without exposing sensitive data or coupling tests to incidental translated copy where avoidable.
+
+**Environments and data**
+
+- Use synthetic users, transactions, messages, evidence, locations, provider fixtures, and isolated local/CI/staging environments. Never run automated destructive/consequential mobile tests against production.
+- Use provider sandboxes/emulators/stubs where available, while retaining a small explicit real-sandbox integration gate for capabilities that stubs cannot prove.
+- Reset/namespace test accounts, idempotency keys, push installations, temporary files, permissions, and server state so runs are repeatable and parallel-safe.
+- Test network loss, timeout, duplicate response/push, stale state, conflicts, process/activity loss, and uncertain outcomes explicitly.
+
+**CI and release gates**
+
+- Pull requests run format/static analysis, unit, provider/controller, widget/accessibility, generated-client/contract checks, and selected fast stable goldens.
+- Device/integration/Patrol suites run at a cadence based on runtime and reliability—pre-merge where feasible, otherwise nightly and mandatory before release. Critical regression tests cannot be indefinitely relegated to manual execution.
+- Release qualification includes critical journeys in both languages, supported Android versions/devices, clean install/upgrade, real provider sandbox checks, TalkBack/Accessibility Scanner, camera/location/push/deep-link/service behavior, and documented manual checks.
+- A failing/flaky test is fixed, quarantined with an owner/reason/deadline, or replaced by equivalent evidence; it is not silently ignored.
+
+**Coverage policy**
+
+- Do not use one arbitrary line-coverage percentage as the sole quality gate.
+- Require direct expected, validation, authorization, boundary, retry/idempotency/conflict, permission denial, session/logout/compromise, location/evidence, push/deep-link, and regression coverage for changed critical behavior.
+- Collect coverage to identify gaps, but review risk and assertions rather than optimizing a number.
+
+Exact package versions, directory naming, fake/mock package, golden tooling, CI device farm, test cadence, and supported-device matrix remain later decisions/configuration.
+
+### Rationale
+
+- Official Flutter tools provide the fastest and most stable feedback for most logic and UI.
+- Patrol fills a proven native-system gap without introducing a separate YAML/WebDriver test language.
+- Selective use controls runtime/flakiness while covering Kirim's permissions, camera, notification, and deep-link risks.
+- Deterministic fakes and synthetic environments support reliable tests without production data/effects.
+- Risk-based coverage aligns with Kirim's consequential workflows better than an arbitrary percentage.
+
+### Alternatives Considered
+
+- **Official Flutter tools only:** Not selected because `integration_test` cannot fully operate required native permission/system UI flows; manual-only coverage would leave important regressions late.
+- **Maestro:** Not selected initially because it adds a separate black-box YAML toolchain and sees Flutter through semantics rather than sharing Dart test helpers/state.
+- **Appium:** Rejected as disproportionately heavy for the MVP.
+- **Patrol for every end-to-end test:** Rejected because native E2E suites are slower/more fragile; most behavior belongs in lower test layers.
+- **Mocks everywhere:** Rejected because deterministic fakes usually produce clearer behavior-focused tests and less coupling.
+
+### Consequences
+
+**Benefits**
+
+- Fast layered feedback plus native Android coverage.
+- Tests remain primarily in Dart/Flutter.
+- Explicit platform compatibility/flakiness gate for Patrol.
+- Accessibility, bilingual, lifecycle, and failure paths become release evidence.
+
+**Costs and constraints**
+
+- Patrol adds CLI/native setup and CI maintenance.
+- Device tests are slower and may be OEM/system-version sensitive.
+- Physical/manual tests remain necessary for TalkBack, battery, location, push, and camera quality.
+- Synthetic environment orchestration requires backend/provider fixtures and cleanup.
+
+### Revisit Triggers
+
+Review this decision if Patrol cannot meet stability/compatibility gates; native-test runtime becomes unsustainable; Maestro or another tool provides demonstrably better reliable coverage; iOS changes cross-platform needs; or a device farm imposes different supported tooling. Replacement must preserve required native-system scenarios and failure diagnostics.
+
+### References
+
+- Flutter testing overview: https://docs.flutter.dev/testing/overview
+- Flutter integration tests: https://docs.flutter.dev/testing/integration-tests
+- Flutter plugin testing: https://docs.flutter.dev/testing/testing-plugins
+- Patrol native automation: https://patrol.leancode.co/documentation/native/overview
+- Patrol package: https://pub.dev/packages/patrol
+
+### Affected Areas
+
+- `docs/TECH_STACK.md`
+- Flutter unit/provider/widget/golden/integration tests
+- Android native-system E2E tests and CI
+- Synthetic backend/provider fixtures and test data
+- Accessibility, device, release, and regression quality gates

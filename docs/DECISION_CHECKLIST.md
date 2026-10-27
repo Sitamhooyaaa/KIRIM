@@ -72,11 +72,11 @@ Use this file as a reminder of the major decisions required to build Kirim with 
 - [x] **DEC-033:** Online-first Flutter client with in-memory server state, minimal non-sensitive preferences, controlled temporary files, and no offline consequential-action queue.
 - [ ] **DEC-034 partial:** Provider-separated Flutter map/backend routing architecture approved; Google Maps is the leading candidate, but exact renderer/routing/geocoding vendor remains deferred pending licence/retention, quality, cost, privacy, and SDK verification.
 - [x] **DEC-035:** Foreground location for matching/evidence plus explicit active-transaction foreground-service sharing; no unrestricted background-location permission initially.
-- [ ] Camera, receipt, and evidence-upload implementation.
-- [ ] Push-notification integration.
-- [ ] Localization implementation.
-- [ ] Accessibility and mobile design conventions.
-- [ ] Flutter test tooling.
+- [x] **DEC-036:** Official `image_picker` with system camera, approved Photo Picker fallback, preview/retake, original-byte preservation, Android lost-result recovery, and existing secure upload pipeline.
+- [x] **DEC-037:** Direct FCM via `firebase_messaging`, backend HTTP v1 sending, authenticated installation registration, privacy-minimal payloads, and server-authoritative catch-up.
+- [x] **DEC-038:** Flutter `gen_l10n` with English/Bahasa Malaysia ARB resources, typed accessors, `intl`, English fallback, in-app override, and human-reviewed consequential copy.
+- [x] **DEC-039:** Material 3 with a small semantic token layer, WCAG 2.2 AA and Android/Flutter accessibility gates, 48 dp targets, 200% text scaling, and TalkBack/manual testing.
+- [x] **DEC-040:** Official Dart/Flutter unit, provider, widget, golden, and integration tooling plus selective Patrol native-system tests after a compatibility spike.
 - [ ] Android signing and controlled distribution.
 
 ## F. React Admin Console Decisions
@@ -174,6 +174,6 @@ Use this file as a reminder of the major decisions required to build Kirim with 
 
 ## Current Progress
 
-- Major accepted decision records: **35**.
-- Remaining planning decisions: approximately **23**, including final map/routing vendor selection.
-- Current next topic: **Flutter camera, receipt, and evidence-upload implementation**.
+- Major accepted decision records: **40**.
+- Remaining planning decisions: approximately **18**, including final map/routing vendor selection.
+- Current next topic: **Android signing and controlled distribution**.
