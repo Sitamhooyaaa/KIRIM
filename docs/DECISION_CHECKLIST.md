@@ -77,14 +77,14 @@ Use this file as a reminder of the major decisions required to build Kirim with 
 - [x] **DEC-038:** Flutter `gen_l10n` with English/Bahasa Malaysia ARB resources, typed accessors, `intl`, English fallback, in-app override, and human-reviewed consequential copy.
 - [x] **DEC-039:** Material 3 with a small semantic token layer, WCAG 2.2 AA and Android/Flutter accessibility gates, 48 dp targets, 200% text scaling, and TalkBack/manual testing.
 - [x] **DEC-040:** Official Dart/Flutter unit, provider, widget, golden, and integration tooling plus selective Patrol native-system tests after a compatibility spike.
-- [ ] Android signing and controlled distribution.
+- [x] **DEC-041:** Stage A via Firebase App Distribution with separate staging identity/key; Stage B via Play internal/closed testing, AAB, Play App Signing, and protected CI upload key.
 
 ## F. React Admin Console Decisions
 
 - [ ] React and TypeScript versions.
 - [ ] Build tool.
 - [ ] Routing approach.
-- [ ] API data-fetching and cache approach.
+- [x] **DEC-042:** Feature-first Admin SPA with TanStack Query for in-memory server state, safe URL list state, local UI state, limited Context, and no optimistic consequential mutations.
 - [ ] Forms and runtime validation.
 - [ ] UI/component approach.
 - [ ] Admin authentication and browser-session security.
@@ -174,6 +174,6 @@ Use this file as a reminder of the major decisions required to build Kirim with 
 
 ## Current Progress
 
-- Major accepted decision records: **40**.
-- Remaining planning decisions: approximately **18**, including final map/routing vendor selection.
-- Current next topic: **Android signing and controlled distribution**.
+- Major accepted decision records: **42**.
+- Remaining planning decisions: approximately **16**, including final map/routing vendor selection.
+- Current next topic: **React and TypeScript versions**.
