@@ -4260,3 +4260,987 @@ Review this decision if substantial complex cross-feature client-only state emer
 - Server-data fetching, caching, mutation, and invalidation
 - Admin session boundaries and browser storage
 - Privileged action UX, authorization, audit, and tests
+
+---
+
+## DEC-043 — 2026-10-18 — Use React 19.3 and TypeScript 7.0 Stable Lines
+
+- **Status:** Accepted
+- **Decision owner:** Product Owner
+
+### Context
+
+The Admin SPA needs an explicit, reproducible framework and language baseline. As of this decision, the verified current stable releases are React/React DOM 19.3.1, matching React type packages on the 19.3 line, and TypeScript 7.0.2. Floating versions or prerelease channels would make builds non-reproducible, while selecting older lines without a demonstrated incompatibility would create immediate upgrade debt. The complete Admin toolchain has not yet been scaffolded, so exact patch selection must remain subject to compatibility verification.
+
+### Decision
+
+- Adopt the stable **React 19.3** and **TypeScript 7.0** release lines for the Admin SPA.
+- At scaffolding, compatibility-test and pin exact stable patch versions for `react`, `react-dom`, TypeScript, matching React type packages, and the selected build/router/query/test/lint/generated-client toolchain.
+- Use identical `react` and `react-dom` versions and matching React 19.3 type lines. Prevent duplicate React runtimes.
+- Do not use beta, release-candidate, canary, nightly, development, or floating `latest` dependencies in approved builds.
+- Pin direct dependencies exactly, commit the selected package manager's lockfile, and require deterministic lockfile-based CI installation. Package-manager selection remains a separate decision.
+
+**TypeScript baseline**
+
+- Enable strict checking and, unless a verified tooling limitation requires a documented exception, enable `strict`, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, `noImplicitOverride`, `noFallthroughCasesInSwitch`, and `useUnknownInCatchVariables`.
+- Use the modern React JSX transform.
+- Treat external/API/browser data as `unknown` until validated; avoid `any` and broad suppressions such as `@ts-ignore`.
+- Allow narrowly scoped, documented generated-code/tooling exceptions without weakening application-code checks globally.
+- Type-check application and test code in CI. Compile-time TypeScript types do not replace runtime boundary validation.
+
+**Upgrade policy**
+
+- Patch upgrades require an isolated dependency change, automated checks, and focused smoke verification.
+- Minor upgrades require release-note review and compatibility verification for builds, generated clients, routing, data queries, forms, and tests.
+- Major upgrades require an explicit compatibility review and approved decision/change plan.
+- Security fixes may be expedited but still require recorded validation; framework upgrades must not be hidden inside unrelated feature work.
+
+**Fallback**
+
+- If scaffolding proves a blocking TypeScript 7 or React 19.3 ecosystem incompatibility, temporarily pin the newest compatible stable version only after recording the dependency/issue evidence, security implications, owner, workaround, and revisit trigger. Do not silently downgrade.
+
+### Rationale
+
+- Current stable lines provide supported fixes and avoid starting with unnecessary version debt.
+- Exact pins plus a lockfile provide reproducible local and CI builds.
+- A compatibility gate recognizes that framework, compiler, generated-client, and lint/test tooling must work as a complete system.
+- Strict TypeScript settings improve boundary and state correctness in a privileged Admin interface.
+
+### Alternatives Considered
+
+- **Previous React 19 minor and TypeScript 6.x:** Not selected because no verified Kirim-specific incompatibility justifies beginning on older lines.
+- **Floating `latest` or broad ranges:** Rejected because dependency resolution could change without review and undermine reproducibility.
+- **Prerelease/canary versions:** Rejected because Kirim does not require experimental framework/compiler features.
+- **Weak TypeScript settings for speed:** Rejected because Admin financial, authorization, evidence, and audit workflows benefit from stronger compile-time checks.
+
+### Consequences
+
+**Benefits**
+
+- Modern stable React/TypeScript baseline.
+- Deterministic dependency installation and controlled upgrades.
+- Stronger application-state, nullability, indexing, and boundary checks.
+
+**Costs and constraints**
+
+- TypeScript 7 compatibility must be proven across the selected ecosystem.
+- Strict settings can require more explicit narrowing and test-fixture typing.
+- Exact pins require intentional dependency-update work.
+
+### Revisit Triggers
+
+Review this decision if the scaffolding compatibility spike finds a blocker, a supported security release requires movement, React or TypeScript ends support for the selected line, or a major framework/tooling change is approved.
+
+### References
+
+- React versions: https://react.dev/versions
+- React 19.3 release: https://react.dev/blog/2026/09/09/react-19-3
+- TypeScript downloads: https://www.typescriptlang.org/download/
+- TypeScript releases: https://devblogs.microsoft.com/typescript/
+
+### Affected Areas
+
+- `docs/TECH_STACK.md`
+- Admin package manifest and lockfile
+- TypeScript and JSX configuration
+- Build, lint, generated-client, test, and CI compatibility
+- Dependency update and security policy
+
+---
+
+## DEC-044 — 2026-10-18 — Use Vite for the React Admin SPA Build
+
+- **Status:** Accepted
+- **Decision owner:** Product Owner
+
+### Context
+
+Kirim's Admin client is an independently deployed React/TypeScript SPA, not a full-stack React application. It needs a maintained development server and production bundler without introducing a second application server or a large custom build configuration. React officially documents Vite, Parcel, and Rsbuild for from-scratch applications; Create React App is deprecated. Vite transpiles TypeScript but deliberately does not perform complete type checking, so build success alone cannot be the quality gate.
+
+### Decision
+
+- Use **Vite** as the Admin SPA development server and production build tool.
+- Use the official React plugin, initially `@vitejs/plugin-react`, unless the scaffolding compatibility spike demonstrates a documented reason to select another official Vite React transform.
+- At scaffolding, select and exactly pin the latest stable Vite/plugin versions compatible with React 19.3, TypeScript 7.0, the chosen Node runtime/package manager, router, TanStack Query, test/lint stack, and generated API client.
+- Produce static production assets for deployment; do not add a Node application server solely to serve the Admin SPA.
+
+**Build and quality gates**
+
+- Run TypeScript checking separately with `tsc --noEmit` (or the approved project-reference equivalent), because Vite transpilation is not type checking.
+- CI independently runs formatting, linting, type checking, tests, and a production Vite build. A successful bundle does not excuse another failed gate.
+- Use deterministic lockfile installation and generate controlled artifacts from CI rather than an unrecorded developer workstation.
+- Do not commit `dist/` or local Vite caches.
+- Monitor build warnings, chunk composition, and bundle growth. Establish evidence-based budgets after the first representative Admin flows rather than choosing an arbitrary initial threshold.
+
+**Configuration and secrets**
+
+- Treat every value included in browser JavaScript, HTML, source maps, static files, or Vite-exposed environment variables as public.
+- Never place server secrets, private credentials, signing material, privileged API keys, or session secrets in `VITE_*` variables or the SPA artifact.
+- Define a typed allowlist/schema for required public client configuration and validate it during build/startup as appropriate. Fail clearly on missing, malformed, or contradictory configuration.
+- Keep development, staging, and production endpoints/identities explicit and prevent accidental production/staging cross-configuration. Whether CI builds per environment or promotes one artifact with a public runtime-config file is finalized with deployment design.
+
+**SPA hosting and security**
+
+- Configure the static host/CDN to return `index.html` for valid client-side navigation fallback only. Do not rewrite API failures or missing asset requests to HTML.
+- Use content-hashed immutable caching for versioned assets and short/no-cache behavior for the HTML entry point and mutable public runtime configuration if adopted.
+- Serve only over HTTPS with appropriate security headers; exact CSP, HSTS, frame, referrer, MIME, and permissions policies are finalized with Admin deployment/security decisions.
+- Do not add a service worker, PWA installation, or offline application cache initially because privileged Admin data/actions must remain online and cache behavior adds security/update complexity.
+- Keep production source maps non-public. If required for diagnostics, generate/upload them privately to the approved error-monitoring service and control retention/access.
+
+**Scope boundaries**
+
+- Do not adopt Create React App, custom webpack configuration, or a full-stack React framework for this SPA.
+- Defer React Compiler adoption until it has a demonstrated Kirim benefit and passes compatibility/testing review; it is not implied by selecting Vite or React 19.3.
+- Vite development preview commands are not production servers.
+
+### Rationale
+
+- Vite is a maintained, mainstream fit for a small independent React/TypeScript SPA.
+- Static artifacts preserve the approved separation between Admin UI and FastAPI backend.
+- Explicit type-check and test gates avoid confusing fast transpilation with correctness.
+- Public-only configuration and no initial service worker reduce secret leakage, stale-client, and privileged-cache risks.
+
+### Alternatives Considered
+
+- **Rsbuild/Rspack:** Credible and fast, but not selected because Kirim has no demonstrated webpack-plugin compatibility or build-scale need that outweighs Vite's familiarity/ecosystem.
+- **Parcel:** Credible low-configuration option, but offers no material Kirim-specific advantage over Vite.
+- **Custom webpack:** Rejected because it adds avoidable configuration and maintenance for the minimal Admin SPA.
+- **Create React App:** Rejected because it is deprecated.
+- **Full-stack React framework:** Previously not selected under DEC-007; Kirim already has a separate FastAPI backend and does not need another server runtime for Admin.
+
+### Consequences
+
+**Benefits**
+
+- Fast local development and straightforward optimized static builds.
+- Small build configuration with broad React ecosystem support.
+- Clear separation between transpilation, type checking, testing, and deployment.
+
+**Costs and constraints**
+
+- Hosting requires correct SPA fallback and cache/header configuration.
+- Client environment values are build/runtime-public and require disciplined allowlisting.
+- Source-map and artifact handling require deployment integration.
+- Toolchain compatibility must be verified before exact version locking.
+
+### Revisit Triggers
+
+Review this decision if Vite cannot support the approved React/TypeScript/toolchain versions, Admin requires server rendering or server components, build performance becomes materially problematic, or deployment constraints prohibit the static-SPA model.
+
+### References
+
+- React from-scratch tooling: https://react.dev/learn/build-a-react-app-from-scratch
+- Create React App deprecation: https://react.dev/blog/2025/02/14/sunsetting-create-react-app
+- Vite guide: https://vite.dev/guide/
+- Vite production build: https://vite.dev/guide/build
+- Vite TypeScript behavior: https://vite.dev/guide/features
+- Vite environment variables: https://vite.dev/guide/env-and-mode
+
+### Affected Areas
+
+- `docs/TECH_STACK.md`
+- Admin package manifest, lockfile, and Vite configuration
+- TypeScript/build/lint/test CI gates
+- Client configuration and secret boundaries
+- Static hosting, caching, security headers, and source maps
+
+---
+
+## DEC-045 — 2026-10-18 — Use React Router Data Mode for the Admin SPA
+
+- **Status:** Accepted
+- **Decision owner:** Product Owner
+
+### Context
+
+The Admin SPA needs nested operational routes, direct links, lazy feature loading, route-level failures, login/MFA redirects, and safe browser back/forward behavior. TanStack Query already owns server data and mutations, so routing must not create a competing data lifecycle. Hash routing would avoid host fallback configuration but would produce fragment URLs and hide application paths from HTTP hosting/monitoring; Kirim expects a controlled static host where correct fallback can be configured. A custom router would recreate mature infrastructure without product benefit.
+
+### Decision
+
+- Use **React Router in Data Mode** with `createBrowserRouter`/`RouterProvider` and browser-history URLs.
+- Select and exactly pin the latest stable release compatible with React 19.3, TypeScript 7.0, Vite, TanStack Query, and the test stack during scaffolding.
+- Define a reviewable route tree with nested layouts, route-level error boundaries, and lazy-loaded feature implementations where useful.
+- Do not adopt React Router Framework Mode or use it as another server/full-stack runtime.
+
+**Data ownership**
+
+- TanStack Query remains the sole owner of API server cache, query lifecycle, and domain mutations.
+- Route loaders are limited to navigation concerns such as session/bootstrap checks, login/MFA redirects, safe route-parameter validation, and optional prefetch through shared TanStack Query query definitions.
+- Do not independently fetch the same resource in a loader and component. Shared query definitions/keys must be used when loader prefetch is justified.
+- Do not use React Router actions as a second mutation system for consequential Admin domain operations.
+
+**Authentication and authorization UX**
+
+- Client route guards, hidden routes, and redirects are usability controls only. FastAPI enforces authentication, MFA/session assurance, capabilities, assignment, relationships, workflow state, and resource authorization on every request.
+- Distinguish unauthenticated, MFA-required, authenticated-but-forbidden, missing-resource, stale/conflict, and application-failure states rather than redirecting all failures to one page.
+- Validate post-login/return locations against an internal allowlist and normalized route representation; never accept an arbitrary external redirect target.
+- Clear/cancel route-associated query state at logout, session expiry/revocation, principal/role change, or other authentication boundary changes.
+
+**URL policy**
+
+- Use opaque resource identifiers in path segments. Do not place names, phone numbers, emails, addresses, evidence descriptions/URLs, action reasons, tokens, secrets, or session data in paths/query strings/fragments.
+- Use query parameters only for approved safe list/search/filter/sort/pagination/view state.
+- Runtime-validate and normalize all path and search parameters. Malformed or unknown values produce an explicit safe outcome or approved default rather than reaching API construction unchecked.
+- Exact route names remain tied to approved Admin requirements and must not expose unapproved capabilities.
+
+**Navigation, accessibility, and hosting**
+
+- Provide route-level errors plus a top-level fatal fallback. Preserve useful safe list state when navigating to a resource and back.
+- Manage page titles, main-heading/focus movement, loading announcements, and keyboard behavior for route transitions as part of accessibility testing.
+- Use navigation blocking/confirmation for dirty forms where useful, while recognizing it cannot guarantee interception of every reload, crash, external navigation, or process termination. Persisting privileged drafts requires a separate decision.
+- Configure the static host to serve the SPA entry point for valid application navigation only. Exclude `/api/*`, existing/missing static assets, and other non-SPA paths from fallback rewriting.
+- Do not use hash routing unless a later approved hosting constraint makes browser-history fallback impossible or materially unreliable.
+
+### Rationale
+
+- React Router Data Mode provides structured nested routing, lazy routes, errors, and navigation lifecycle without adopting a full-stack framework.
+- Browser-history URLs improve usability and operational visibility under a host Kirim controls.
+- Keeping TanStack Query authoritative avoids duplicate caches and mutation patterns.
+- Server authorization remains explicit rather than being confused with route visibility.
+
+### Alternatives Considered
+
+- **TanStack Router:** Strong route/search typing and Query integration, but not selected because the small Admin route graph does not currently justify its additional type/convention complexity; runtime validation remains necessary either way.
+- **React Router Declarative Mode:** Viable for a very small SPA, but Data Mode better centralizes lazy routes, errors, bootstrap redirects, and optional shared-query prefetch.
+- **Hash routing:** Not selected because Kirim expects controlled hosting with rewrite support; fragment URLs reduce clean-path usability and host-side route visibility. It remains a fallback for a proven hosting constraint.
+- **Custom routing:** Rejected because it would recreate matching, history, nesting, errors, blockers, and accessibility behavior without Kirim-specific benefit.
+- **React Router Framework Mode:** Not selected because Kirim approved a separate Vite SPA and FastAPI backend rather than another full-stack server/runtime.
+
+### Consequences
+
+**Benefits**
+
+- Mature nested routing, errors, redirects, and lazy loading.
+- Clean direct-linkable browser-history URLs.
+- Clear boundary between routing and TanStack Query server state.
+- Explicit route/auth/accessibility test targets.
+
+**Costs and constraints**
+
+- Static hosting must implement and test precise SPA fallback behavior.
+- Route/search parameter typing and runtime validation require explicit schemas/helpers.
+- Loader/query integration requires discipline to avoid duplicate fetching.
+- Browser navigation blockers cannot guarantee draft preservation.
+
+### Revisit Triggers
+
+Review this decision if the selected host cannot support safe SPA fallback, route/search type complexity becomes materially error-prone, Admin requires server rendering/framework features, or React Router compatibility/maintenance changes substantially.
+
+### References
+
+- React Router modes: https://reactrouter.com/start/modes
+- Data router: https://reactrouter.com/api/data-routers/createBrowserRouter
+- Navigation blocking: https://reactrouter.com/how-to/navigation-blocking
+- Error boundaries: https://reactrouter.com/how-to/error-boundary
+
+### Affected Areas
+
+- `docs/TECH_STACK.md`
+- Admin route tree, layouts, lazy features, and error boundaries
+- Login/MFA/return navigation and session-boundary behavior
+- TanStack Query prefetch/invalidation ownership
+- URL validation/privacy and static-host fallback
+- Admin navigation/accessibility tests
+
+---
+
+## DEC-046 — 2026-10-18 — Use React Hook Form with Zod for Admin Forms and Runtime Validation
+
+- **Status:** Accepted
+- **Decision owner:** Product Owner
+
+### Context
+
+The Admin SPA includes operational forms for case handling, evidence decisions, account controls, disputes, refunds, reimbursements, payouts, and other audited actions. These need consistent dirty/touched/submission state, accessible errors, runtime validation, and reliable mapping of backend RFC 9457 problems. Native React state would repeatedly recreate this behavior, while client validation must never be mistaken for backend authorization or domain validation.
+
+### Decision
+
+- Use **React Hook Form**, **Zod**, and the compatible official/community resolver integration (`@hookform/resolvers`) for Admin form mechanics and client-side runtime schemas.
+- Exactly pin compatible stable versions during the approved React 19.3/TypeScript 7.0 scaffolding spike.
+- Infer form value types from Zod schemas where practical. Keep feature-specific schemas with their owning feature and share only genuinely common primitives.
+
+**Validation ownership and boundaries**
+
+- Client validation is a usability and early-error mechanism only. FastAPI remains authoritative for input validation, authentication, MFA/session assurance, authorization, assignment, workflow state, financial rules/calculations, idempotency, concurrency, evidence access, and audit behavior.
+- Use Zod for form input, approved route/search parameters, public client configuration, and selected browser/external values where runtime validation is required.
+- Finalize API-response runtime validation with the generated OpenAPI client decision rather than manually duplicating every backend schema. TypeScript types alone do not validate network data.
+- Parse unknown data at boundaries and expose normalized typed values only after successful validation.
+
+**Form and value handling**
+
+- Preserve raw text as strings until explicit validation/conversion. Avoid implicit coercion that turns empty or malformed input into valid-looking values.
+- Do not use JavaScript binary floating point for authoritative monetary calculations. Represent/edit money according to the approved API money contract (for example decimal strings or integer minor units) and let the backend calculate/validate authoritative amounts.
+- Use explicit date/time/time-zone semantics and approved enumerations rather than locale-dependent parsing.
+- Prefer submit or touched/blur validation over showing errors before interaction; exact mode may vary by field risk and usability testing.
+- Prevent accidental duplicate UI submission while a mutation is pending, while still relying on backend idempotency and concurrency controls.
+- Do not clear or claim success after an uncertain network outcome. Refresh authoritative state before allowing a potentially duplicate consequential action.
+- Do not persist privileged form drafts to browser storage initially. Draft persistence requires a separate security, expiry, encryption, logout, and shared-device decision.
+
+**Server errors**
+
+- Map RFC 9457 field validation errors to corresponding fields when the public contract safely identifies them.
+- Present domain, authorization, conflict/precondition, rate-limit, uncertain, and general errors in an accessible form-level summary rather than forcing them into an unrelated field.
+- Preserve appropriate non-secret user input after recoverable errors. Do not expose stack traces, internal identifiers, policy internals, or raw provider errors.
+- A disabled submit button, modal closure, or client navigation is never evidence that the server action succeeded.
+
+**Consequential actions**
+
+- Refunds, reimbursements, payouts, dispute outcomes, suspensions, security holds, and similarly consequential operations require explicit reason/context and a review/confirmation step showing the exact target, action, amount where relevant, and submitted reason.
+- Confirmation does not replace current server authorization, idempotency, precondition/concurrency checks, or audit recording.
+- After authoritative success, refresh all affected resource, financial projection, case, account, and audit queries under DEC-042.
+
+**Accessibility and localization**
+
+- Provide persistent visible labels, associated instructions/errors, appropriate input types/autocomplete, `aria-invalid`, `aria-describedby`, and a linked accessible error summary.
+- On failed submission, move focus predictably to the summary or first invalid field without trapping keyboard/screen-reader users.
+- Do not rely on placeholder text or color alone. Confirmation/cancellation must be keyboard operable and clear at supported zoom/text scaling.
+- Validation messages and consequential confirmation copy use approved localized/human-reviewed resources where applicable; schemas should expose stable issue identifiers rather than making business logic depend on display text.
+
+**Testing**
+
+- Unit-test schemas at valid, invalid, boundary, empty, normalization, and transformation cases.
+- Component-test field and summary association, focus behavior, keyboard use, submission state, server error mapping, retained input, and uncertain outcomes.
+- Test money/date handling without locale or floating-point ambiguity and verify consequential actions require confirmation.
+- Use synthetic users, cases, evidence, reasons, and amounts only.
+
+### Rationale
+
+- React Hook Form provides mature form-state/submission primitives without a general application store.
+- Zod aligns runtime validation with strict TypeScript inference and can support multiple Admin boundaries.
+- Explicit backend authority prevents client schemas from becoming security or business-rule enforcement.
+- Shared form/error conventions improve accessibility and operational reliability.
+
+### Alternatives Considered
+
+- **TanStack Form with Zod:** Credible and strongly typed, but not selected because Kirim does not currently need its additional reactive form model and using TanStack Query does not require an all-TanStack stack.
+- **Native React form state with Zod:** Rejected as the default because it would duplicate touched/dirty/nested/error/submission/reset behavior across operational forms.
+- **Formik with Yup:** Mature, but offers no material advantage over React Hook Form/Zod for this strict TypeScript baseline.
+- **Browser/HTML validation only:** Rejected because it cannot express or consistently present the required cross-field/runtime/error behavior, though semantic HTML constraints remain useful progressive UX.
+- **Client validation as authoritative:** Rejected because clients are untrusted and can be bypassed or stale.
+
+### Consequences
+
+**Benefits**
+
+- Consistent typed forms and reusable validation/error patterns.
+- Accessible client and server error presentation.
+- Safer consequential-action confirmation and uncertain-outcome handling.
+
+**Costs and constraints**
+
+- Three related dependencies require compatibility and upgrade management.
+- Controlled component libraries may need explicit field adapters.
+- Client schemas can drift unless contracts/tests and backend authority remain clear.
+- API response validation remains to be resolved with client generation.
+
+### Revisit Triggers
+
+Review this decision if React Hook Form/Zod compatibility blocks the approved stack, form complexity materially exceeds the model, generated OpenAPI runtime schemas provide a better single-source path, or accessibility testing reveals systemic limitations.
+
+### References
+
+- React Hook Form: https://react-hook-form.com/get-started
+- React Hook Form Zod integration: https://react-hook-form.com/integrations/zod
+- React Hook Form state: https://react-hook-form.com/docs/useform/formstate
+- Zod basics: https://zod.dev/basics
+- Zod error formatting: https://zod.dev/error-formatting
+
+### Affected Areas
+
+- `docs/TECH_STACK.md`
+- Admin forms, schemas, field adapters, and confirmation flows
+- RFC 9457 problem mapping and TanStack Query mutations
+- Money/date/runtime boundary handling
+- Accessibility, localization, and form tests
+
+---
+
+## DEC-047 — 2026-10-18 — Use Material UI Core with a Restrained Kirim Admin Theme
+
+- **Status:** Accepted
+- **Decision owner:** Product Owner
+
+### Context
+
+The private Admin/Support SPA needs accessible, consistent operational tables, forms, dialogs, navigation, alerts, and loading/error states without first building a bespoke web design system. React Aria and Radix provide strong primitives but require greater styling/component ownership; custom HTML/CSS alone would repeatedly recreate complex focus and interaction behavior. Material UI supports the approved React/TypeScript baseline and can accelerate the small Admin scope, but its use does not itself establish WCAG compliance. MUI X advanced components have separate Community/Pro/Premium capabilities and licensing implications.
+
+### Decision
+
+- Use **Material UI Core** as the primary Admin component library, with native semantic HTML where it is simpler or more appropriate.
+- Create a restrained centralized Kirim Admin theme covering approved brand/semantic colors, typography, spacing, shape, focus indicators, elevation, status presentation, and selected component defaults.
+- At scaffolding, exactly pin stable MUI Core and styling-engine versions compatible with React 19.3, TypeScript 7.0, Vite, React Hook Form, and the test stack.
+- Prefer theme defaults/variants, then small shared Kirim operational components, then local `sx` for genuinely local layout. Avoid repeated magic values and broad overrides of MUI internals.
+- Do not build a large token/component platform before representative screens demonstrate reusable patterns.
+
+**Initial component scope**
+
+- Use MUI Core/native semantics for the application shell, navigation, buttons/links, fields/selects, short bounded dialogs, alerts, status labels, semantic tables, tabs where justified, and loading/empty/error states.
+- Use full pages or dedicated panels for complex investigations; use dialogs only for short focused decisions that fit safely without hidden context.
+- Tooltips provide supplementary explanation only and never contain the sole label, instruction, permission rationale, or critical outcome.
+
+**Tables and operational queues**
+
+- Use real table semantics for tabular data, with captions/accessible names, header associations, keyboard-accessible controls, and explicit sorting state.
+- Use server-side allowlisted filtering/sorting and cursor pagination. Do not use infinite scrolling for case-management queues.
+- Do not adopt **MUI X** initially, including paid Pro/Premium functionality. Begin with MUI Core tables and purpose-built controls.
+- Any later Data Grid adoption requires defined requirements, compatibility/accessibility/bundle testing, licensing review, and approval before relying on Community, Pro, or Premium features.
+
+**Status, feedback, and consequential actions**
+
+- Never communicate state by color alone; combine stable human-readable text with an icon/shape where useful.
+- Provide explicit loading, empty, partial, stale, forbidden, conflict/precondition, uncertain, retryable, and permanent-failure presentations.
+- Toasts/snackbars may supplement feedback but are never the sole durable indication of consequential success/failure. Keep the updated resource/audit state visible.
+- Consequential confirmation UI follows DEC-046 and identifies the exact target, action, amount where relevant, and reason.
+
+**Accessibility**
+
+- MUI is an implementation aid, not evidence that Kirim meets WCAG 2.2 AA. Kirim remains responsible for semantic composition, labels/descriptions, contrast, focus order/visibility, dialog focus entry/trapping/restoration, screen-reader output, table semantics, zoom/reflow, target sizing, and reduced motion.
+- Avoid overriding roles, keyboard handlers, focus management, or internal structure unless necessary and covered by focused tests.
+- Test representative workflows with keyboard-only use, browser accessibility tooling, and supported screen readers; include high zoom/text scaling and non-color status checks.
+- Manage route/page titles, headings, landmarks, and transition focus consistently with DEC-045.
+
+**Responsive scope and styling**
+
+- Design desktop-first for operational investigation while keeping critical workflows usable on practical tablet/narrow-laptop widths. A complete phone-optimized Admin application is outside MVP unless approved later.
+- Use the approved MUI styling engine/theme; do not add Tailwind, another full component system, or an additional CSS-in-JS framework initially.
+- Keep custom global CSS minimal and intentional. Avoid styling by unstable generated class names or component internals.
+
+### Rationale
+
+- MUI Core supplies mature operational components and interaction behavior without a bespoke design-system effort.
+- A restrained theme enables consistency with modest maintenance and reasonable alignment with the Flutter Material application.
+- Semantic/native fallbacks and explicit accessibility testing prevent library lock-in from replacing standards-based UI quality.
+- Deferring MUI X avoids premature complexity and licensing surprises.
+
+### Alternatives Considered
+
+- **React Aria Components with custom CSS:** Strong accessibility-oriented behavior and visual control, but more design/styling work than the minimal Admin requires.
+- **Radix primitives/shadcn-style local ownership:** Flexible and accessible at the primitive layer, but Kirim would own more copied component code and operational patterns.
+- **Semantic HTML/custom CSS only:** Appropriate for simple elements but insufficient as the sole strategy for complex dialogs, menus, popovers, autocomplete, and focus behavior.
+- **MUI X from the start:** Rejected because cursor-paginated MVP queues do not yet justify grid complexity or paid-license risk.
+- **Multiple UI/styling systems:** Rejected because overlapping conventions increase bundle, theme, accessibility, and maintenance complexity.
+
+### Consequences
+
+**Benefits**
+
+- Faster consistent Admin implementation.
+- Mature components for forms, dialogs, tables, navigation, and feedback.
+- Central theme and clear reuse path without a large initial design-system project.
+
+**Costs and constraints**
+
+- Adds MUI and its styling runtime to the client bundle.
+- Accessibility still requires application-level composition and testing.
+- Deep visual/internal overrides are discouraged and can complicate upgrades.
+- Advanced grid needs remain deferred and may later involve licensing.
+
+### Revisit Triggers
+
+Review this decision if MUI compatibility or bundle/runtime cost becomes unacceptable, accessibility testing reveals systemic blockers, brand requirements exceed practical theming, Admin mobile support is approved, or advanced grid requirements justify a separately reviewed MUI X/alternative adoption.
+
+### References
+
+- Material UI installation: https://mui.com/material-ui/getting-started/installation/
+- Material UI accessibility: https://mui.com/material-ui/getting-started/accessibility/
+- Material UI tables: https://mui.com/material-ui/react-table/
+- MUI X licensing: https://mui.com/x/introduction/licensing/
+
+### Affected Areas
+
+- `docs/TECH_STACK.md`
+- Admin theme, application shell, shared components, and styling
+- Tables, queues, dialogs, status, loading/error feedback
+- Accessibility and responsive tests
+- Dependency and MUI X licensing controls
+
+---
+
+## DEC-048 — 2026-10-18 — Use Same-Origin Admin Session Cookies with Synchronizer CSRF Protection
+
+- **Status:** Accepted
+- **Decision owner:** Product Owner
+
+### Context
+
+DEC-014 established managed email/password plus TOTP, a Kirim-owned opaque server-side Admin session, Secure HttpOnly cookies, bounded expiry, rotation, and immediate revocation. The remaining browser transport decision is how the Vite SPA reaches FastAPI and how cookie-authenticated mutations resist CSRF. A separate frontend/API origin is workable but adds credentialed CORS and cookie complexity. Kirim expects controlled hosting capable of routing static Admin assets and proxying an API path under one origin.
+
+### Decision
+
+**Preferred topology**
+
+- Serve the Admin SPA and proxy its Admin API under the **same HTTPS origin**, for example an Admin host with `/api/v1/...` routed to FastAPI. This ingress routing is not a separate backend-for-frontend and does not move authorization/domain logic out of FastAPI.
+- Use a host-only opaque session cookie following the `__Host-` constraints: `Secure`, `HttpOnly`, `Path=/`, no `Domain`, and `SameSite=Strict` unless a verified authentication/provider flow requires a narrowly documented exception.
+- JavaScript never reads, copies, logs, serializes, or persists the session identifier. Server-side expiry/revocation remains authoritative.
+- If the selected deployment cannot reliably support same-origin proxying, a separate same-site API origin is an approved fallback only after documenting exact credentialed CORS, cookie, origin, preflight, monitoring, and test controls. Wildcard origins are forbidden with credentials.
+
+**CSRF controls**
+
+- Use a cryptographically random **synchronizer CSRF token** bound to the authoritative Admin session.
+- Deliver it through an authenticated session/bootstrap response, keep it in memory only, and send it in a dedicated request header for every state-changing cookie-authenticated request.
+- Do not place CSRF tokens in cookies as the sole synchronizer mechanism, URLs, browser storage, logs, analytics, error reports, or HTML that can be cached publicly.
+- Rotate/invalidate the CSRF token when the session identifier rotates or the session ends. Compare submitted tokens safely and reject absent, malformed, expired, or mismatched values.
+- Validate the request `Origin` against the exact approved Admin origin for state-changing requests, with narrowly specified `Referer` fallback only where appropriate. Reject unexpected, opaque/`null`, or absent origin evidence unless another explicitly approved mechanism establishes the same guarantee.
+- Require approved API content types/custom headers. `GET`, `HEAD`, and `OPTIONS` never perform state changes. SameSite is defense in depth, not the sole CSRF protection.
+- Apply suitable login-CSRF, logout, MFA enrollment/reset, recovery, and recent-authentication protections to each flow based on whether a pre-authenticated session exists.
+
+**Session lifecycle and SPA behavior**
+
+- Rotate the session after successful primary authentication/MFA completion, relevant privilege change, and recent-authentication elevation; invalidate the previous identifier.
+- On logout, expiry, revocation, principal/role/security-state change, or definitive `401`, cancel requests and clear TanStack Query plus sensitive component/form state. A `403` is not treated as an automatic logout because it may be resource authorization denial.
+- Backend idle/absolute expiry is authoritative. The SPA may warn before expected idle expiry but cannot extend the absolute lifetime silently or infer validity from its own timer.
+- Cross-tab logout/session-change notification may use `BroadcastChannel` or an equivalent event mechanism, but never include credentials, CSRF tokens, evidence, personal data, or sensitive case content.
+- Return after login/re-authentication only to normalized allowlisted internal routes/action context.
+
+**Caching, embedding, and browser exposure**
+
+- Sensitive authenticated Admin API responses use `Cache-Control: no-store` and must not be cached by service workers or persisted by the application.
+- Prevent Admin framing using CSP `frame-ancestors 'none'` and compatible legacy defense where needed. Exact CSP and other headers are finalized/tested with deployment, Vite, MUI's styling engine, provider flows, and monitoring; do not weaken script controls casually to solve styling/configuration issues.
+- Hashed public static assets may use immutable caching; the Admin HTML/bootstrap/runtime configuration uses short/no-cache behavior appropriate to release and session safety.
+- No Admin session/access/refresh/CSRF secret is stored in `localStorage`, `sessionStorage`, IndexedDB, URLs, service-worker caches, ordinary React/TanStack persisted state, logs, or analytics.
+
+**Testing and operations**
+
+- Test missing/invalid CSRF tokens, cross-origin submissions, malformed content types, stale/rotated sessions, fixation prevention, logout, concurrent tabs, idle/absolute expiry, role removal, MFA/password reset, and compromise revocation.
+- Verify direct nested-route navigation, API proxy exclusions, missing static assets, and that fallback rewrites never convert API errors into SPA HTML.
+- Audit session creation/rotation/revocation and security-sensitive failures without logging cookie/token values.
+
+Exact production hostnames, cookie/header names, CSRF token representation, provider callback flow, CSP directives/nonces, ingress product, concurrent-session limit, and recent-authentication windows remain later configuration/security decisions.
+
+### Rationale
+
+- Same-origin routing removes unnecessary credentialed CORS complexity and enables strong host-only cookie constraints.
+- Synchronizer tokens plus origin validation and SameSite provide layered CSRF protection for privileged actions.
+- HttpOnly server sessions reduce direct credential theft from ordinary browser JavaScript while preserving immediate Kirim revocation.
+- Explicit cache/state clearing limits sensitive-data persistence and cross-principal leakage.
+
+### Alternatives Considered
+
+- **Separate same-site Admin/API origins:** Approved only as a deployment fallback; it adds exact credentialed CORS, preflight, cookie, and debugging complexity.
+- **SameSite cookie alone:** Rejected because SameSite is defense in depth and does not replace an explicit CSRF control for privileged mutations.
+- **Custom header/origin checks without a synchronizer token:** Not selected as the primary model because the stateful session can support a session-bound token as another independent check.
+- **JavaScript-managed bearer/provider tokens:** Rejected under DEC-014 because XSS could directly read and exfiltrate them and Kirim would have weaker privileged-session ownership.
+- **Dedicated Admin BFF:** Deferred because same-origin ingress proxying achieves the browser topology without another application server or duplicated authorization logic.
+
+### Consequences
+
+**Benefits**
+
+- Strong, understandable browser security boundary with reduced CORS complexity.
+- Layered CSRF, fixation, expiry, and revocation protections.
+- No script-readable long-lived Admin credential.
+- Clear SPA cache/session-boundary behavior.
+
+**Costs and constraints**
+
+- Hosting must support precise same-origin API proxying and route exclusions.
+- CSRF token lifecycle and error handling add backend/client implementation.
+- Strict cookie/provider/CSP interactions require integration testing.
+- The cross-origin fallback requires a separate documented security review.
+
+### Revisit Triggers
+
+Review this decision if the identity provider requires incompatible cross-site flows, hosting cannot safely proxy the API, browser cookie behavior changes materially, security review requires phishing-resistant/device-bound sessions, or a dedicated BFF is later justified.
+
+### References
+
+- OWASP CSRF Prevention: https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html
+- OWASP Session Management: https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet
+- MDN `Set-Cookie`: https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Set-Cookie
+- OWASP Content Security Policy: https://cheatsheetseries.owasp.org/cheatsheets/Content_Security_Policy_Cheat_Sheet.html
+
+### Affected Areas
+
+- `docs/TECH_STACK.md`
+- `docs/API_CONTRACTS.md`
+- Admin ingress/static hosting/API topology
+- FastAPI session, CSRF, origin, cookie, cache, and security-header middleware
+- SPA bootstrap/logout/query/form/session-expiry behavior
+- Identity-provider callbacks, security tests, monitoring, and incident response
+
+---
+
+## DEC-049 — 2026-10-18 — Use a Layered Vitest, Testing Library, MSW, axe-core, and Playwright Admin Test Stack
+
+- **Status:** Accepted
+- **Decision owner:** Product Owner
+
+### Decision
+
+Use Vitest for fast unit/integration execution, React Testing Library plus `user-event` for user-observable component behavior, MSW for HTTP-boundary mocks, axe-core for automated accessibility checks, and Playwright for deployed-like browser journeys. Pin compatible stable versions at scaffolding.
+
+Pull requests run formatting, linting, TypeScript, unit/component/MSW tests, selected axe checks, and the production build. Release/integration gates run Playwright against the same-origin SPA/API with synthetic accounts and a real test PostgreSQL/PostGIS backend. Critical coverage includes login/TOTP, cookie/CSRF lifecycle, direct routes, case/evidence access, financial/dispute actions, idempotency uncertainty, stale preconditions, logout/cache clearing, keyboard use, and accessibility. Authentication-state files, traces, screenshots, and videos are sensitive CI artifacts with bounded retention and are never committed.
+
+Coverage is diagnostic, not an arbitrary quality substitute. Tests assert behavior and semantics rather than MUI/React internals. MSW never replaces real-backend contract/integration tests, and automated axe scans never replace manual keyboard, screen-reader, zoom/reflow, and wording review.
+
+### Alternatives Considered
+
+Jest was not selected because Vitest aligns with Vite without a second transform pipeline. Cypress remains credible but Playwright better fits isolated browser contexts and multi-session testing. Browser-only testing was rejected as too slow for schemas, utilities, and component states.
+
+### Revisit Triggers
+
+Review if Vitest/Vite compatibility fails, Playwright is unreliable on the selected CI platform, or supported-browser requirements materially change.
+
+### References
+
+- https://vitest.dev/guide/
+- https://testing-library.com/docs/guiding-principles/
+- https://mswjs.io/docs/
+- https://playwright.dev/docs/intro
+- https://playwright.dev/docs/accessibility-testing
+
+### Affected Areas
+
+- `docs/TECH_STACK.md`
+- Admin test configuration, fixtures, CI, browser artifacts, and accessibility gates
+
+---
+
+## DEC-050 — 2026-10-18 — Use a Monorepo with uv, pnpm, and a Pinned Flutter SDK
+
+- **Status:** Accepted
+- **Decision owner:** Product Owner
+
+### Decision
+
+Use one Git monorepo containing `apps/mobile`, `apps/admin`, `services/backend`, `infra`, `docs`, and repository-level scripts/configuration. Keep generated clients inside their consuming application or a clearly generated subtree; do not create a cross-language shared-domain package that bypasses API contracts.
+
+Use **uv** for Python project/environment/lock management, **pnpm** for the Admin Node workspace, and a repository-pinned Flutter SDK (FVM is the leading mechanism, accepted if its Windows/Linux/CI spike passes). Use the active Node.js LTS line compatible with the approved Vite/TypeScript toolchain. Commit exactly one authoritative lockfile per ecosystem plus the Flutter lockfile; deterministic CI installs must reject silent lock changes.
+
+The pre-scaffolding spike must prove Python 3.14, uv, Psycopg/SQLAlchemy/Alembic, API/Worker dependency groups, pnpm/Vite/React 19.3/TypeScript 7, Flutter/Android tooling, Windows local development, and Linux CI/container builds. A failed tool compatibility result is documented and replaced with the narrowest supported alternative rather than silently forcing the choice.
+
+### Rationale
+
+A monorepo keeps API contracts, migrations, mobile/Admin consumers, CI, infrastructure, and documentation reviewable in one change while retaining separate deployable artifacts. The selected package tools provide fast deterministic installs without introducing application architecture coupling.
+
+### Alternatives Considered
+
+Multiple repositories were rejected for the small team because they complicate coordinated contracts/releases. Poetry/PDM/pip-tools and npm/yarn remain fallbacks only if the compatibility spike demonstrates a blocker. A single language-agnostic package manager was rejected because the ecosystems have different native tooling.
+
+### Revisit Triggers
+
+Review if repository scale/permissions require separation, package-tool compatibility fails, or independent release ownership becomes materially beneficial.
+
+### Affected Areas
+
+- `docs/TECH_STACK.md`
+- Repository tree, lockfiles, local setup, CI caches, and generated-client placement
+
+---
+
+## DEC-051 — 2026-10-18 — Standardize Risk-Based Testing, Formatting, Types, Contracts, and Dependency Hygiene
+
+- **Status:** Accepted
+- **Decision owner:** Product Owner
+
+### Decision
+
+Use the following engineering baseline:
+
+- **Backend:** Ruff formatting/linting, Pyright strict project configuration, pytest, pytest-cov, and real PostgreSQL/PostGIS integration tests using disposable Docker/CI services or Testcontainers where reliable.
+- **Admin:** Prettier, ESLint flat configuration with typescript-eslint and relevant React/accessibility rules, `tsc --noEmit`, and DEC-049 testing.
+- **Flutter:** `dart format`, `flutter analyze`, official tests, and DEC-040 Patrol gates.
+- **API/contracts:** generated OpenAPI validation, generated-client drift checks, representative consumer compilation/tests, and an OpenAPI breaking-change checker selected at scaffolding (oasdiff is the leading candidate).
+- **Security/dependencies:** GitHub dependency review/alerts, CodeQL for supported languages, secret scanning, Gitleaks in CI, OSV/dependency audit for lockfiles, and Trivy for release container images. Do not suppress findings without owner, rationale, expiry, and compensating control.
+
+Use risk-based coverage: directly test authorization, financial transitions/ledger, retries/idempotency, concurrency, provider webhooks/reconciliation, session/CSRF, evidence/location access, migration/restore, and regressions. Coverage reports identify gaps but no single percentage can replace critical-path evidence.
+
+Use short-lived branches from protected `main`, pull requests, required checks/review, squash merge, and Conventional Commit-style messages. No force-push to protected `main`. Dependency updates are isolated, lockfile-reviewed changes: patches may be automated after checks, minors require release-note review, and majors require explicit compatibility approval. Renovate is the leading multi-ecosystem update bot; exact bot configuration is finalized after repository scaffolding.
+
+### Alternatives Considered
+
+Black/isort/Flake8 were not selected because Ruff covers the initial formatting/lint scope. mypy remains a fallback if Pyright cannot model the selected libraries adequately. SQLite-only backend tests, snapshot-heavy UI tests, and coverage-only gates were rejected.
+
+### Revisit Triggers
+
+Review when tooling compatibility fails, false-positive burden becomes material, or production incidents reveal missing gates.
+
+### Affected Areas
+
+- `docs/TECH_STACK.md`
+- CI checks, editor settings, test fixtures, security scans, branch protection, and dependency updates
+
+---
+
+## DEC-052 — 2026-10-18 — Use GitHub Actions with Immutable Artifacts and Approved Environment Promotion
+
+- **Status:** Accepted
+- **Decision owner:** Product Owner
+
+### Decision
+
+Use **GitHub Actions** for pull-request validation, release builds, security scans, migrations, and deployments. Use GitHub Environments for staging/production approvals and environment-scoped secrets. Authenticate to Google Cloud with short-lived Workload Identity Federation/OIDC rather than stored service-account keys.
+
+Build backend API/Worker/migration images once per release, store them in Artifact Registry by immutable digest, and promote the same tested digest. Build the Admin static artifact reproducibly and deploy it through Firebase Hosting channels/sites. Mobile artifacts follow DEC-041. Generated artifacts include provenance, commit/tag, dependency locks, checksums, migration head, and release notes.
+
+The deployment order is: preflight/backup checks; forward-safe migration job; API deployment with health/readiness checks; Worker deployment; Admin deployment; smoke tests; controlled availability. Use staging first and explicit production approval. Production deploy credentials are unavailable to ordinary pull-request jobs and untrusted forks.
+
+Rollback means halting rollout/traffic and redeploying a known compatible image where schema permits; database changes follow expand/contract and normally recover forward. Never automatically downgrade an applied migration. Failed or uncertain release tasks stop promotion and require reconciliation.
+
+### Alternatives Considered
+
+Cloud Build and GitLab CI were not selected because source and collaboration already use GitHub. Long-lived cloud keys and workstation production deploys were rejected. Rebuilding separately per environment was rejected because it weakens artifact provenance.
+
+### Revisit Triggers
+
+Review if GitHub Actions reliability/security becomes insufficient, deployment scale requires progressive delivery tooling, or organizational policy mandates another CI platform.
+
+### Affected Areas
+
+- `docs/TECH_STACK.md`
+- GitHub branch/environments, Artifact Registry, Firebase Hosting, Cloud Run, migrations, and release evidence
+
+---
+
+## DEC-053 — 2026-10-18 — Use Google Cloud Singapore for Managed Runtime and Core Data Services
+
+- **Status:** Accepted
+- **Decision owner:** Product Owner
+
+### Decision
+
+Use isolated Google Cloud projects for test/staging and production, with production core services in **Singapore (`asia-southeast1`)** where supported:
+
+- Cloud Run service for FastAPI.
+- Cloud Run Worker service with instance-based billing and at least one minimum instance; it remains restart-tolerant and lease/reconciliation-driven because instances are not immortal.
+- Cloud Run Jobs for Alembic migrations and controlled one-off operational tasks.
+- Cloud SQL for PostgreSQL with PostGIS, automated backups, PITR, encryption, private connectivity where practical, and a tested restore process. Enable HA for Stage B unless cost/risk review explicitly accepts a time-bounded exception.
+- Cloud Storage regional private buckets for evidence states, backups/exports where approved, and release support artifacts.
+- Secret Manager for deployed secrets with least-privilege service identities and versioned rotation.
+- Artifact Registry for immutable container images.
+- Firebase Hosting for the Admin static SPA with a same-origin `/api/**` rewrite to Cloud Run, subject to cache/header/rewrite verification.
+
+Keep local, CI, staging, and production data/secrets/provider credentials isolated. Staging remains synthetic. Core account, transaction, ledger, location, message, and evidence data should remain in Singapore-managed resources at rest where service guarantees allow; third-party providers may process bounded data elsewhere only after DPA, transfer, retention, and privacy review. Do not claim universal Singapore residency for global services.
+
+Infrastructure must be reproducible as code. Terraform is the leading choice and is accepted subject to a small state/backend/provider-version spike; pin providers and protect remote state. No manual console-only production resource is authoritative.
+
+### Rationale
+
+The GCP stack supplies the approved managed runtime, PostGIS database, private storage, secrets, same-origin Admin hosting, FCM/Firebase integration, and Singapore region with modest operational surface.
+
+### Alternatives Considered
+
+AWS and Azure can satisfy the architecture but would add no demonstrated MVP advantage. Render/Railway/Fly.io are simpler in some areas but provide a less cohesive Singapore data, private networking, identity, and managed-operations story for this stack. Kubernetes was rejected as premature.
+
+### Revisit Triggers
+
+Review if cost, service limits, worker reliability, legal/data-location review, or provider availability fails the Stage B gate.
+
+### References
+
+- https://cloud.google.com/run/docs/locations
+- https://cloud.google.com/sql/docs/postgres/extensions
+- https://firebase.google.com/docs/hosting/cloud-run
+- https://cloud.google.com/secret-manager/docs
+
+### Affected Areas
+
+- `docs/TECH_STACK.md`
+- GCP projects/IAM/networking/runtime/database/storage/secrets/hosting/infrastructure code
+
+---
+
+## DEC-054 — 2026-10-18 — Use Google Cloud Observability with OpenTelemetry and Privacy-Safe Client Diagnostics
+
+- **Status:** Accepted
+- **Decision owner:** Product Owner
+
+### Decision
+
+Use structured JSON application logs to stdout/stderr, Cloud Logging, Cloud Monitoring, Error Reporting, managed uptime checks, dashboards, and alert policies. Instrument backend/worker operations with OpenTelemetry APIs and W3C trace context while keeping export/configuration replaceable. Correlate request, job, transaction-safe reference, provider event, and audit identifiers without placing raw tokens, message bodies, evidence, precise locations, payment details, or unnecessary personal data in telemetry.
+
+Define service-level indicators for API availability/latency, error rates, database saturation, job queue age/permanent failure, payment webhook/reconciliation, settlement backlog, notification failures, evidence quarantine/scan backlog, login/verification abuse, and backup/restore health. Alerts route to an owned on-call/pilot channel with severity, runbook, deduplication, and test procedure.
+
+Use Firebase Crashlytics for Android only after privacy/DPA review and with default PII/custom-key minimization; no evidence, route, address, message, token, or financial content. Automatic collection/consent behavior follows the approved privacy notice and can be disabled by environment. For Admin browser errors, initially send a minimal scrubbed error envelope to a Kirim backend endpoint that writes to Cloud Logging/Error Reporting; do not add session replay or a third-party browser recording SDK. Source maps remain private release artifacts.
+
+Set explicit log/trace/error retention and access controls before Stage B. Staging/test telemetry is separated and synthetic. Audit records are domain data in PostgreSQL, not replaceable by operational logs.
+
+### Alternatives Considered
+
+A full Sentry deployment was deferred because its hosted regions and PII/scrubbing surface add another data processor before evidence shows a need. Provider-only unstructured logs and session replay were rejected. OpenTelemetry preserves future portability.
+
+### Revisit Triggers
+
+Review if Cloud tooling lacks required mobile/browser debugging, alerting cost becomes excessive, or a dedicated observability provider passes privacy/residency review.
+
+### Affected Areas
+
+- `docs/TECH_STACK.md`
+- Logging schemas, OpenTelemetry, dashboards, alerts, Crashlytics, client error ingestion, retention, and runbooks
+
+---
+
+## DEC-055 — 2026-10-18 — Use Auth0, Twilio Verify, and Amazon SES as Conditional Identity/Communication Selections
+
+- **Status:** Accepted with mandatory pre-implementation gates
+- **Decision owner:** Product Owner
+
+### Decision
+
+Use **Auth0** as the leading managed identity provider and approve it for implementation only after a spike proves native Authorization Code + PKCE/OIDC, rotating refresh-token reuse detection, database email/password, email verification/reset, Android SDK behavior, TOTP enrollment/recovery/reset for Admin, assurance claims, management/audit APIs, tenant-region/DPA terms, account linking exclusions, and Kirim security-version/revocation integration. Prefer the closest suitable Auth0 public-cloud region (Australia is the leading region) after legal/privacy review; tenant region is effectively a migration decision.
+
+Use **Twilio Verify** as the leading phone-verification service, separate from login/MFA. Approval requires Malaysian delivery tests, current regulatory/template compliance (`RM 0.00`/brand and prohibited content as applicable), fraud/rate controls, number normalization, replay/expiry handling, provider outage behavior, DPA/retention, and capped pilot cost. Kirim stores only necessary verification state and provider references, never OTP values.
+
+Use **Amazon SES in `ap-southeast-1` (Singapore)** as the leading transactional email provider for Kirim-owned operational/security emails, with domain authentication, least-privilege API credentials, sandbox-exit/deliverability proof, bounce/complaint handling through verified SNS events, suppression rules, templates, rate limits, and no sensitive evidence/payment content. Auth0-managed credential emails may use Auth0's supported email-provider integration; exact ownership/templates must avoid conflicting sender/security semantics.
+
+These are conditional selections, not permission to begin Stage B. If any gate fails, compare the narrowest replacement without changing Kirim-owned account/authorization contracts.
+
+### Alternatives Considered
+
+Firebase Auth did not clearly match the already approved OIDC Authorization Code + PKCE/provider-session model for email/password native login. AWS Cognito offers a cohesive cloud option but has a more complex hosted/native and customization model. SMS/email OTP as Admin MFA remains rejected. Postmark is operationally simple but does not establish Singapore-selectable stored-data residency.
+
+### Revisit Triggers
+
+Any provider contract, pricing, Malaysia deliverability, regional-processing, SDK, MFA/recovery, or security-control failure triggers reevaluation before implementation.
+
+### References
+
+- https://auth0.com/blog/oauth-2-best-practices-for-native-apps/
+- https://auth0.com/platform/cloud-deployment
+- https://www.twilio.com/en-us/guidelines/my/sms
+- https://docs.aws.amazon.com/general/latest/gr/ses.html
+
+### Affected Areas
+
+- `docs/TECH_STACK.md`
+- Authentication, verification/recovery, SMS/email templates/events, privacy, costs, and provider adapters
+
+---
+
+## DEC-056 — 2026-10-18 — Use GCS Quarantine Scanning and Keep the Maps Vendor Gated
+
+- **Status:** Accepted; maps vendor remains gated
+- **Decision owner:** Product Owner
+
+### Decision
+
+Use regional private Google Cloud Storage buckets/prefixes with separate least-privilege identities for pending/unscanned, clean/original, derivative, and quarantine states. Upload/download remains backend-proxied under DEC-026. Trigger durable scanning work after commit; verify declared type against magic bytes, enforce size/dimension/decode limits, run maintained ClamAV malware signatures in an isolated scanner, and create controlled image derivatives by full decode/re-encode where needed. Scanner failure, timeout, unsupported type, or suspicious content fails closed to quarantine/manual review. Originals remain immutable according to evidence retention; clean derivatives never replace them.
+
+Use FCM directly under DEC-037. Do not add OneSignal or another push broker initially.
+
+Keep the map renderer/routing/geocoding vendor **unapproved**. Google Maps remains a display candidate, but public terms restrict retention/use of Routes content and therefore do not yet satisfy Kirim's need for durable auditable route snapshots/reuse. The final design may use separate display and backend-routing providers. Approval requires written contractual confirmation for exact stored fields/retention/attribution/map pairing, KL route quality, Flutter/Android SDK behavior, privacy, pricing/quotas, outage handling, and a migration/export plan. Do not implement against undocumented public OSM endpoints or assume Mapbox/HERE/TomTom route storage rights.
+
+### Alternatives Considered
+
+Public objects, direct unaudited signed downloads, PostgreSQL blobs, scanner-success-by-timeout, and automatic destructive replacement of originals were rejected. Managed third-party file scanning may replace ClamAV only if privacy, region, formats, failure behavior, and cost are superior. Google Maps was not approved merely for ecosystem convenience because licensing is a product blocker.
+
+### Revisit Triggers
+
+Review file architecture if volumes justify direct signed transfer or a managed scanner. Resolve maps before implementing route-dependent production behavior.
+
+### References
+
+- https://cloud.google.com/architecture/automate-malware-scanning-for-documents-uploaded-to-cloud-storage
+- https://cloud.google.com/maps-platform/terms/maps-service-terms
+
+### Affected Areas
+
+- `docs/TECH_STACK.md`
+- Evidence storage/scanner/retention, FCM, maps/routing procurement and compatibility spike
+
+---
+
+## DEC-057 — 2026-10-18 — Use a Stripe Connect Candidate Behind a Mandatory Payment Feasibility Gate
+
+- **Status:** Accepted as candidate only; production provider unapproved
+- **Decision owner:** Product Owner
+
+### Decision
+
+Use **Stripe Connect for Malaysia** as the leading payment candidate and build no production payment workflow until contractual, legal/accounting/tax, sandbox, and failure-recovery evidence proves the exact Kirim model: initial Customer-held amount, later itemized balance, Shopper personal advance, cancellation/refund, dispute blocking, reimbursement/fee allocation, and settlement no earlier than 24 hours after confirmed delivery when no dispute is open.
+
+The spike must prove supported Malaysian connected-account type/onboarding/KYC, separate charges/transfers or another approved funds flow, authorization/capture and availability windows, manual payout/transfer timing, platform/connected-account loss and dispute liability, fees, refunds/reversals, negative balances, failed payouts, FPX/card differences, webhook ordering/duplicates, reconciliation APIs/exports, and whether Kirim's terminology is legally accurate. Provider availability does not imply Kirim may market funds as escrow.
+
+Implement a provider adapter, signed webhook endpoint, durable deduplicating inbox, raw-event hash/minimal retained payload, provider-object mapping, idempotent commands, periodic reconciliation, and visible exception queues. The Kirim ledger records immutable internal events and never treats a webhook or client response alone as final. Settlement jobs recheck transaction/dispute/payment/provider state transactionally immediately before transfer/payout.
+
+Testing uses a deterministic fake provider for exhaustive domain failures plus Stripe sandbox/test clocks where supported and contract tests against the real sandbox. Stage B requires a documented manual reconciliation and pilot-pause procedure.
+
+### Alternatives Considered
+
+Adyen for Platforms, Airwallex, Xendit, and local acquirers remain fallback evaluations if Stripe cannot support the exact Malaysian marketplace/liability model. A generic card gateway without connected-account/payout support, manual bank transfers, and Kirim-held wallet/escrow were rejected for MVP.
+
+### Revisit Triggers
+
+Any legal, contractual, sandbox, pricing, payout, liability, or 24-hour settlement mismatch blocks selection and triggers provider comparison or requirement change.
+
+### References
+
+- https://support.stripe.com/questions/connect-availability-for-businesses-located-in-malaysia
+- https://stripe.com/en-my/connect/pricing
+
+### Affected Areas
+
+- `docs/TECH_STACK.md`
+- Payment provider contract, ledger, webhooks, jobs, reconciliation, support, legal review, and Stage B gate
+
+---
+
+## DEC-058 — 2026-10-18 — Use Forward-Safe Releases, Synthetic Staging, Tested Recovery, and Audited Pilot Controls
+
+- **Status:** Accepted
+- **Decision owner:** Product Owner
+
+### Decision
+
+Use fully isolated synthetic local/CI/staging environments. Production data is never copied to non-production. Provide deterministic synthetic fixtures for all workflow/payment/evidence/location/error states and resettable test accounts. Provider sandboxes use synthetic identities and bounded test destinations.
+
+Database releases follow reviewed Alembic expand/migrate/contract sequencing. Backward-compatible schema/API changes deploy before code that requires them; destructive cleanup occurs only after supported old clients/jobs are gone and recovery evidence exists. Large backfills are resumable jobs with progress, throttling, idempotency, and rollback/forward plan—not one long blocking migration.
+
+Enable Cloud SQL automated backups and PITR before Stage B, protect evidence with appropriate Cloud Storage soft-delete/retention/lifecycle controls, and document encryption/IAM/export dependencies. Run scheduled restore drills into an isolated project, verify application/ledger/evidence consistency, record achieved RPO/RTO, and destroy restored sensitive test resources safely. Backups are not considered valid until restoration is demonstrated.
+
+Implement audited server-side operational controls to pause new requests, acceptance, payment initiation, settlement/payout, evidence upload, messaging, or the entire pilot independently where safe. Controls default safely, require authorized reason/ticket/expiry where appropriate, are visible in Admin, and never silently rewrite existing obligations. Maintain incident severity, escalation, provider contact, user communication, evidence preservation, reconciliation, and post-incident review runbooks.
+
+Prefer roll-forward correction. Application rollback uses immutable compatible artifacts; migrations are not automatically reversed. Every release records compatibility, migration head, backup status, smoke checks, owner, and rollback/forward actions.
+
+### Alternatives Considered
+
+Production-derived staging, startup migrations, destructive in-place migration edits, untested backups, and a single unaudited global feature flag were rejected.
+
+### Revisit Triggers
+
+Review after restore/incident exercises, measured data volume, provider constraints, or Stage B readiness review.
+
+### Affected Areas
+
+- `docs/TECH_STACK.md`
+- Environments, fixtures, migrations, deployment, backups/restores, incident response, and pilot pause
+
+---
+
+## DEC-059 — 2026-10-18 — Use Flutter 3.47 and Android 11 as the Initial Mobile Baseline
+
+- **Status:** Accepted
+- **Decision owner:** Product Owner
+
+### Decision
+
+Use the stable **Flutter 3.47** release line with its bundled Dart SDK; select and repository-pin the latest compatible stable patch during scaffolding after the full plugin/Gradle/Android build spike. Do not upgrade Dart independently from the selected Flutter SDK or use beta/dev channels.
+
+Set the initial MVP Android minimum to **Android 11 / API 30**, compile against **API 36**, and target **API 36** or the higher level required by Google Play at release time. Raising the minimum requires target-user/device evidence and approval; lowering it below API 30 requires security, plugin, location/foreground-service, camera/picker, notification, TLS/WebView, performance, and test evidence.
+
+The representative device matrix includes the API 30 minimum, a middle supported release, and the current target/release API; at least one low-resource physical device, a current Samsung-class device, and another common Malaysian OEM where available. Test clean install, upgrade, process death, low storage/memory, poor network, battery restrictions, camera/Photo Picker, push, App Links, location/foreground service, text scaling, TalkBack, and English/Bahasa Malaysia. Emulator-only evidence is insufficient for Stage B.
+
+Use 64-bit Play artifacts and current Android Gradle/JDK tooling supported by the pinned Flutter release. Exact ABI packaging, Gradle/AGP/JDK versions, device models, and performance budgets are fixed by the scaffolding/device spike and committed release documentation.
+
+### Rationale
+
+Flutter 3.47 is the current stable line in the decision window and supports API 24–37, while Android 11+ covers the overwhelming majority of current Malaysian Android usage indicated by available market evidence and avoids carrying very old platform behavior into a safety/payment/location application. API 36 meets the current 2026 Play target requirement.
+
+### Alternatives Considered
+
+Flutter beta/dev and independently selected Dart were rejected for instability. Flutter's API 24 technical floor was not chosen as the product floor because the invite-only pilot can use a more supportable security/device baseline. Android 13+ would simplify further but would exclude a more meaningful pilot segment without demonstrated need.
+
+### Revisit Triggers
+
+Review after pilot recruitment/device survey, Flutter/plugin compatibility results, Play policy changes, or measured device failures.
+
+### References
+
+- https://docs.flutter.dev/install/archive
+- https://docs.flutter.dev/reference/supported-platforms
+- https://developer.android.com/google/play/requirements/target-sdk
+
+### Affected Areas
+
+- `docs/TECH_STACK.md`
+- Flutter/Dart pin, Android manifest/Gradle, Play policy, device lab, and compatibility testing

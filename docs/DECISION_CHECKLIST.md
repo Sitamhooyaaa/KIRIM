@@ -1,7 +1,7 @@
 # LLM-Assisted Project Decision Checklist
 
 > Status: Living planning checklist
-> Last updated: 2026-10-05
+> Last updated: 2026-10-18
 
 Use this file as a reminder of the major decisions required to build Kirim with human and AI/LLM contributors.
 
@@ -24,7 +24,7 @@ Use this file as a reminder of the major decisions required to build Kirim with 
 - [x] **DEC-004:** Managed commodity infrastructure with Kirim-owned domain logic.
 - [x] **DEC-005:** Managed application platform deployment model.
 
-## B. Primary Technology Stack — Complete So Far
+## B. Primary Technology Stack — Review Draft Complete
 
 - [x] **DEC-006:** Flutter/Dart mobile client with Android-first release.
 - [x] **DEC-007:** React/TypeScript Admin SPA.
@@ -37,7 +37,7 @@ Use this file as a reminder of the major decisions required to build Kirim with 
 - [x] **DEC-018:** Pragmatic REST-style JSON API with OpenAPI and explicit action subresources.
 - [x] **DEC-019:** `/api/v1`, RFC 9457 errors, cursor pagination, allowlisted filters/sorts, idempotency keys, and optimistic/domain concurrency controls.
 - [x] **DEC-020:** CPython 3.14 runtime line; compatibility-test and lock exact FastAPI/Pydantic/Starlette/ASGI dependency set at scaffolding.
-- [ ] Python package and dependency-management tool — intentionally deferred to backend scaffolding; `uv` is the leading candidate, subject to Windows/Linux, deployment, and dependency-group verification.
+- [x] **DEC-050:** uv for Python with a committed lockfile, subject to the mandatory Windows/Linux/Python 3.14/backend compatibility spike.
 - [x] **DEC-021:** Psycopg 3 with synchronous PostgreSQL access initially for API and Worker.
 - [x] **DEC-022:** SQLAlchemy 2 hybrid with typed ORM mappings and explicit Core/parameterized SQL where appropriate.
 - [x] **DEC-023:** Alembic with reviewed committed migrations, controlled release execution, and forward-safe PostgreSQL/PostGIS policy.
@@ -62,8 +62,8 @@ Use this file as a reminder of the major decisions required to build Kirim with 
 
 ## E. Flutter Mobile Decisions
 
-- [ ] Flutter and Dart versions.
-- [ ] Supported Android OS versions and device baseline.
+- [x] **DEC-059:** Flutter 3.47 stable line with its bundled Dart SDK; exact stable patch pinned after the plugin/Gradle/device spike.
+- [x] **DEC-059:** Android 11/API 30 minimum, API 36 compile/target baseline, and physical low-resource/current OEM device matrix.
 - [x] **DEC-029:** Pragmatic feature-first Flutter architecture with optional layers based on actual complexity.
 - [x] **DEC-029:** Riverpod with manual providers initially, immutable unidirectional state, and widget-local state where appropriate.
 - [x] **DEC-030:** `go_router` with manual routes, verified HTTPS Android App Links, allowlisted targets, and Riverpod-backed bootstrap/auth redirects.
@@ -81,58 +81,58 @@ Use this file as a reminder of the major decisions required to build Kirim with 
 
 ## F. React Admin Console Decisions
 
-- [ ] React and TypeScript versions.
-- [ ] Build tool.
-- [ ] Routing approach.
+- [x] **DEC-043:** React 19.3 and TypeScript 7.0 stable lines, exact compatible patches and matching React types locked at scaffolding with strict TypeScript and controlled upgrades.
+- [x] **DEC-044:** Vite static SPA build with official React plugin, separate type-check/test gates, public-only validated client configuration, and no initial service worker or React Compiler.
+- [x] **DEC-045:** React Router Data Mode with browser-history URLs, nested lazy routes/errors, runtime-validated URL state, limited session/prefetch loaders, and TanStack Query-owned server mutations.
 - [x] **DEC-042:** Feature-first Admin SPA with TanStack Query for in-memory server state, safe URL list state, local UI state, limited Context, and no optimistic consequential mutations.
-- [ ] Forms and runtime validation.
-- [ ] UI/component approach.
-- [ ] Admin authentication and browser-session security.
-- [ ] React testing tools.
-- [ ] Admin build and deployment process.
+- [x] **DEC-046:** React Hook Form with Zod/resolver integration, backend-authoritative validation, accessible RFC 9457 errors, safe money/value handling, and explicit consequential-action confirmation.
+- [x] **DEC-047:** Material UI Core with a restrained centralized Kirim theme, semantic HTML where simpler, explicit WCAG testing, core semantic tables, and no initial MUI X/second styling system.
+- [x] **DEC-014 / DEC-048:** Managed password + mandatory TOTP, Kirim opaque server session, preferred same-origin host-only Secure HttpOnly cookie, synchronizer CSRF header, strict origin validation, bounded expiry, rotation, and revocation.
+- [x] **DEC-049:** Vitest, Testing Library/user-event, MSW, axe-core, and Playwright layered Admin testing.
+- [x] **DEC-052 / DEC-053:** GitHub Actions immutable builds/promotion and Firebase Hosting same-origin Admin deployment to Cloud Run API.
 
 ## G. External Providers
 
-- [ ] Payment provider.
-- [ ] Payment webhook, reconciliation, refund, and payout integration.
-- [ ] Maps/geocoding/routing provider.
-- [ ] Android push-notification provider/configuration.
-- [ ] SMS-delivery provider.
-- [ ] Email-delivery provider.
-- [ ] Private object-storage provider.
-- [ ] File malware/content-safety approach.
-- [ ] Managed application hosting provider.
-- [ ] Hosting region and data-location policy.
-- [ ] Managed PostgreSQL/PostGIS provider.
-- [ ] Secrets-management provider.
-- [ ] Logging, metrics, error-reporting, and alerting provider.
+- [ ] **DEC-057 gated:** Stripe Connect Malaysia is the leading candidate; production approval awaits exact funds-flow, liability, legal/tax/accounting, sandbox, and 24-hour settlement proof.
+- [ ] **DEC-057 gated:** Signed webhook inbox, idempotent commands, immutable ledger, reconciliation, refund/reversal/payout exceptions, fake provider, and sandbox proof must pass before implementation/Stage B.
+- [ ] **DEC-034 / DEC-056 gated:** Split-capable maps architecture accepted; final renderer/routing/geocoding vendor awaits storage/reuse licence, KL quality, privacy, SDK, cost, and contract proof.
+- [x] **DEC-037 / DEC-056:** Direct Firebase Cloud Messaging with minimal hints and server catch-up.
+- [ ] **DEC-055 gated:** Twilio Verify is the leading Malaysian phone-verification candidate pending compliance, deliverability, fraud/rate, DPA, and cost tests.
+- [ ] **DEC-055 gated:** Amazon SES Singapore is the leading Kirim transactional-email candidate pending domain, sandbox-exit, deliverability, event, DPA, and cost tests; Auth0 credential email ownership remains part of the identity spike.
+- [x] **DEC-053 / DEC-056:** Regional private Google Cloud Storage with separated pending/clean/original/derivative/quarantine access.
+- [x] **DEC-056:** Magic/decode/size checks, maintained ClamAV isolation, controlled image derivatives, fail-closed quarantine, and manual review.
+- [x] **DEC-053:** Google Cloud Run/Firebase Hosting managed application platform.
+- [x] **DEC-053:** Singapore `asia-southeast1` core-data region, with explicit third-party/global-service transfer review rather than a universal residency claim.
+- [x] **DEC-053:** Cloud SQL for PostgreSQL/PostGIS with backups/PITR and Stage B HA default.
+- [x] **DEC-053:** Google Secret Manager with least-privilege service identities and versioned rotation.
+- [x] **DEC-054:** Cloud Logging/Monitoring/Error Reporting plus OpenTelemetry; privacy-minimized Crashlytics and scrubbed Admin browser errors.
 
 ## H. Testing and Engineering Standards
 
-- [ ] Backend unit, integration, contract, and end-to-end test tools.
-- [ ] Real PostgreSQL/PostGIS test-environment approach.
-- [ ] Payment-provider sandbox and fake-provider testing strategy.
-- [ ] Formatting and linting tools.
-- [ ] Strict Python and TypeScript type-checking tools.
-- [ ] Coverage and critical-path testing policy.
-- [ ] Security and dependency-scanning tools.
-- [ ] API compatibility/breaking-change checks.
-- [ ] Branch and commit conventions.
-- [ ] Dependency-update policy.
+- [x] **DEC-051:** pytest unit/integration/contract/E2E layers plus DEC-049/DEC-040 client layers.
+- [x] **DEC-051:** Disposable real PostgreSQL/PostGIS through Docker/CI services or Testcontainers; no SQLite substitute for database behavior.
+- [x] **DEC-057:** Deterministic fake provider plus real sandbox/contract/reconciliation tests before Stage B.
+- [x] **DEC-051:** Ruff; Prettier/ESLint/typescript-eslint; `dart format`/`flutter analyze`.
+- [x] **DEC-043 / DEC-051:** Pyright strict and TypeScript strict `tsc --noEmit`, with narrow documented generated-code exceptions.
+- [x] **DEC-040 / DEC-049 / DEC-051:** Risk-based direct critical-path coverage; percentages diagnose gaps but do not replace behavior evidence.
+- [x] **DEC-051:** Dependency review/alerts, CodeQL, secret scanning/Gitleaks, OSV audit, and Trivy release-image scans.
+- [x] **DEC-031 / DEC-051:** OpenAPI validation, generated-client drift/consumer compilation, and a breaking-change checker with oasdiff leading.
+- [x] **DEC-051:** Protected `main`, short-lived branches, PR checks/review, squash merges, and Conventional Commit-style messages.
+- [x] **DEC-043 / DEC-050 / DEC-051:** Exact pins/lockfiles, isolated automated patch updates, reviewed minors, explicitly approved majors, Renovate leading.
 
 ## I. Repository and Delivery
 
-- [ ] Monorepo or multiple repositories.
-- [ ] Final repository/package structure.
-- [ ] Local development environment.
-- [ ] Configuration and environment-variable conventions.
-- [ ] CI provider and quality gates.
-- [ ] Deployment workflow.
-- [ ] Database migration release process.
-- [ ] Rollback and forward-recovery strategy.
-- [ ] Staging-data and synthetic-fixture policy.
-- [ ] Backup and restore implementation.
-- [ ] Incident and pilot-pause implementation.
+- [x] **DEC-050:** One Git monorepo with independently deployable mobile, Admin, backend, and infrastructure areas.
+- [x] **DEC-050:** `apps/mobile`, `apps/admin`, `services/backend`, `infra`, `docs`, and scripts; generated clients remain consumer-owned/generated.
+- [x] **DEC-050 / DEC-053:** Windows-friendly pinned ecosystem tools plus containerized real dependencies and GCP/Firebase emulation/sandboxes where appropriate.
+- [x] **DEC-041 / DEC-044 / DEC-048 / DEC-053:** Typed fail-fast per-process/flavor configuration, public client config, Secret Manager, and strict environment isolation.
+- [x] **DEC-052:** GitHub Actions with required quality/security gates and OIDC/Workload Identity Federation.
+- [x] **DEC-052 / DEC-053:** Immutable Artifact Registry/Firebase artifacts promoted through staging and approved production environments.
+- [x] **DEC-023 / DEC-052 / DEC-058:** Explicit Cloud Run migration job with expand/migrate/contract and resumable backfills.
+- [x] **DEC-052 / DEC-058:** Compatible immutable artifact rollback where possible; forward recovery for schema/data; no automatic migration downgrade.
+- [x] **DEC-058:** Synthetic-only local/CI/staging fixtures and isolated provider sandboxes; no production copies.
+- [x] **DEC-053 / DEC-058:** Cloud SQL backups/PITR, GCS recovery/retention controls, scheduled isolated restore/reconciliation drills.
+- [x] **DEC-058:** Audited granular pilot pause controls plus incident, provider, payment, reconciliation, communication, and post-incident runbooks.
 
 ## J. Design Decisions After `TECH_STACK.md`
 
@@ -174,6 +174,7 @@ Use this file as a reminder of the major decisions required to build Kirim with 
 
 ## Current Progress
 
-- Major accepted decision records: **42**.
-- Remaining planning decisions: approximately **16**, including final map/routing vendor selection.
-- Current next topic: **React and TypeScript versions**.
+- Major accepted decision records: **59**.
+- `docs/TECH_STACK.md` is complete as a Product Owner review draft.
+- Remaining gates are evidence-driven rather than preference decisions: final maps vendor; production payment approval; production identity/SMS/email approval; PostgreSQL job library compatibility; exact locked versions and measured Stage B operating parameters.
+- Current next step: **Product Owner review of the completed technical-stack draft and gated selections**.

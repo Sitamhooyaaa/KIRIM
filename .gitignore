@@ -47,6 +47,17 @@ android/local.properties
 build/
 dist/
 *.log
+playwright-report/
+test-results/
+blob-report/
+
+# Infrastructure local state
+.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
 
 # Tool-specific local state
 .pi/
+.unipi/
+.fvm/

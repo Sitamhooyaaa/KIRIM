@@ -14,9 +14,12 @@
 
 ### Authentication and Authorization
 
-- Authentication mechanism: TBD
-- Authorization model: TBD
-- Service-to-service authentication: TBD
+- Mobile clients authenticate using managed-provider OAuth Authorization Code with PKCE/OIDC access tokens; refresh-session ownership remains with the provider SDK (`DECISIONS.md`, DEC-011 through DEC-013 and DEC-032).
+- Admin users authenticate through managed email/password plus mandatory TOTP, then use a Kirim-owned opaque server session in a host-only Secure HttpOnly SameSite=Strict cookie through the preferred same-origin Admin/API topology (`DECISIONS.md`, DEC-014 and DEC-048).
+- Every state-changing cookie-authenticated Admin request requires a session-bound synchronizer CSRF token in an approved custom header plus exact Origin validation. CSRF tokens and session identifiers never appear in URLs, logs, analytics, or persistent browser storage.
+- Authentication establishes identity/session assurance only. Deny-by-default backend policies enforce capability, relationship, assignment, account/security state, workflow state, current resource access, concurrency, and recent-authentication requirements (`DECISIONS.md`, DEC-015).
+- Client route visibility, disabled controls, locally cached data, mobile role claims, and distribution membership are never authorization evidence.
+- Service-to-service authentication: TBD.
 
 ### Data Format
 
