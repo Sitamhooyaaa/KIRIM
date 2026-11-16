@@ -93,8 +93,8 @@ Use this file as a reminder of the major decisions required to build Kirim with 
 
 ## G. External Providers
 
-- [ ] **DEC-057 gated:** Stripe Connect Malaysia is the leading candidate; production approval awaits exact funds-flow, liability, legal/tax/accounting, sandbox, and 24-hour settlement proof.
-- [ ] **DEC-057 gated:** Signed webhook inbox, idempotent commands, immutable ledger, reconciliation, refund/reversal/payout exceptions, fake provider, and sandbox proof must pass before implementation/Stage B.
+- [ ] **DEC-057 gated:** Stripe Connect Malaysia is the leading candidate; execute `docs/PAYMENT_FEASIBILITY.md` and obtain exact funds-flow, liability, legal/tax/accounting, sandbox, and 24-hour settlement proof before production approval.
+- [ ] **DEC-057 gated:** Complete the payment plan's signed-webhook, idempotency, ledger, reconciliation, refund/reversal/payout, fake-provider, sandbox, outage, and pilot-pause evidence register before Stage B.
 - [ ] **DEC-034 / DEC-056 / DEC-061 gated:** Split-capable maps architecture and minimized route-retention policy accepted; final vendor must permit server matching/corridor derivation and the approved temporary retention, with KL quality, privacy, SDK, cost, and contract proof.
 - [x] **DEC-037 / DEC-056:** Direct Firebase Cloud Messaging with minimal hints and server catch-up.
 - [ ] **DEC-055 gated:** Twilio Verify is the leading Malaysian phone-verification candidate pending compliance, deliverability, fraud/rate, DPA, and cost tests.
