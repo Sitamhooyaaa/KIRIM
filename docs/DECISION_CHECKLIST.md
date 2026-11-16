@@ -95,7 +95,7 @@ Use this file as a reminder of the major decisions required to build Kirim with 
 
 - [ ] **DEC-057 gated:** Stripe Connect Malaysia is the leading candidate; production approval awaits exact funds-flow, liability, legal/tax/accounting, sandbox, and 24-hour settlement proof.
 - [ ] **DEC-057 gated:** Signed webhook inbox, idempotent commands, immutable ledger, reconciliation, refund/reversal/payout exceptions, fake provider, and sandbox proof must pass before implementation/Stage B.
-- [ ] **DEC-034 / DEC-056 gated:** Split-capable maps architecture accepted; final renderer/routing/geocoding vendor awaits storage/reuse licence, KL quality, privacy, SDK, cost, and contract proof.
+- [ ] **DEC-034 / DEC-056 / DEC-061 gated:** Split-capable maps architecture and minimized route-retention policy accepted; final vendor must permit server matching/corridor derivation and the approved temporary retention, with KL quality, privacy, SDK, cost, and contract proof.
 - [x] **DEC-037 / DEC-056:** Direct Firebase Cloud Messaging with minimal hints and server catch-up.
 - [ ] **DEC-055 gated:** Twilio Verify is the leading Malaysian phone-verification candidate pending compliance, deliverability, fraud/rate, DPA, and cost tests.
 - [ ] **DEC-055 gated:** Amazon SES Singapore is the leading Kirim transactional-email candidate pending domain, sandbox-exit, deliverability, event, DPA, and cost tests; Auth0 credential email ownership remains part of the identity spike.
@@ -174,7 +174,7 @@ Use this file as a reminder of the major decisions required to build Kirim with 
 
 ## Current Progress
 
-- Major accepted decision records: **60**.
+- Major accepted decision records: **61**.
 - `docs/TECH_STACK.md` is complete as a Product Owner review draft.
 - Remaining gates are evidence-driven rather than preference decisions: final maps vendor; production payment approval; production identity/SMS/email approval; PostgreSQL job library compatibility; exact locked versions and measured Stage B operating parameters. Stage A/Stage B budget targets are approved under DEC-060.
 - Current next step: **Product Owner review of the completed technical-stack draft and gated selections**.

@@ -5296,3 +5296,67 @@ Review when provider quotes are available, Stage B readiness is assessed, monthl
 - `docs/TECH_STACK.md`
 - `docs/REQUIREMENTS.md`
 - Provider procurement, quotas, scaling, log retention, alerts, and Stage B approval
+
+---
+
+## DEC-061 — 2026-10-18 — Minimize Private Route Retention While Preserving Versioned Pilot Boundaries
+
+- **Status:** Accepted
+- **Decision owner:** Product Owner
+
+### Context
+
+Kirim needs planned route geometry while a Shopper journey is open so it can apply the 1 km matching corridor. Precise routes expose sensitive movement patterns and do not need indefinite retention. Transaction disputes may require limited recent location evidence, while the approved pilot geofence must remain historically reproducible so later boundary changes do not reinterpret past eligibility. Provider licensing may separately restrict route-content processing, derivation, or storage even for short periods.
+
+### Decision
+
+**Unmatched journeys**
+
+- Retain precise origin, destination, optional stops, and generated route geometry only while the journey is active and operationally needed.
+- Delete that precise route data within **24 hours after the journey closes or expires** when no transaction is attached, subject only to an authorized fraud/security/legal hold.
+
+**Transaction-associated routes and location**
+
+- If a journey is attached to a transaction, retain the planned route geometry and required precise transaction-location evidence while the transaction is active and for **30 days after transaction closure**.
+- Extend retention only while an active dispute, fraud/security investigation, accounting/legal obligation, or documented legal hold requires it. Delete promptly after the exception ends.
+- Keep planned-route geometry distinct from live-location samples and evidence events so each can be accessed, exported, held, and deleted according to purpose.
+
+**Pilot boundary history**
+
+- Retain every approved Kirim pilot geofence version, its authoritative GeoJSON/polygon, effective period, approval record, and canonical-route provenance for as long as related historical transaction/eligibility records require it.
+- Historical journeys/transactions reference the applicable immutable `geofence_version_id`; a later geofence revision never changes a past eligibility result.
+- The authoritative geofence must be a Kirim-controlled artifact whose retention and use do not depend on prohibited third-party route-content storage.
+
+**Minimized matching audit**
+
+- After precise route deletion, retain only the minimum non-spatial audit facts required by the approved audit/transaction retention policy: relevant identifiers, matching time, algorithm/configuration version, geofence version, eligibility result, and bounded derived distance/result fields where permitted.
+- Do not retain exact coordinates, encoded polylines, route instructions, provider payloads, or reconstructable private geometry in the minimized audit record.
+- A route hash/provider reference may be retained only if the final provider contract, privacy review, and demonstrated audit purpose permit it; it is not required by this decision.
+
+**Provider gate**
+
+- The routing provider must explicitly permit server-side matching, required corridor derivation, active-journey processing/storage, and up to 30-day transaction/dispute retention for the exact content used.
+- If a display provider does not permit those operations, use it only within its allowed display scope and select a separate routing source/provider with compatible rights. Do not weaken privacy or historical-boundary requirements to fit an assumed provider capability.
+
+### Rationale
+
+The policy minimizes exposure from unmatched/private travel plans while preserving the short dispute window already approved for precise transaction-location evidence. Permanent Kirim-owned geofence versioning provides historical reproducibility without retaining every user's route indefinitely.
+
+### Alternatives Considered
+
+- **Permanent Shopper route retention:** Rejected as unnecessary and privacy-invasive.
+- **Immediate deletion at transaction closure:** Rejected because the approved dispute/evidence period may require recent planned-route/location context.
+- **Retain every provider response for audit:** Rejected due privacy, licensing, minimization, and breach-impact concerns.
+- **Delete old geofence versions:** Rejected because it would make historical eligibility difficult to reproduce and could reinterpret past transactions.
+
+### Revisit Triggers
+
+Review if provider terms prohibit the required temporary use, disputes demonstrate a justified shorter/longer period, legal advice changes location-retention obligations, or the matching model no longer requires route geometry.
+
+### Affected Areas
+
+- `docs/REQUIREMENTS.md`
+- `docs/TECH_STACK.md`
+- `docs/API_CONTRACTS.md`
+- `docs/DATABASE_SCHEMA.md`
+- Journey, matching, transaction-location, geofence, retention, deletion, hold, export, and audit jobs

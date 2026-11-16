@@ -90,6 +90,8 @@ The example hostname and resource paths are placeholders, not approved endpoint 
 - Active live-sharing operations require current transaction authorization and explicit session lifecycle; exact start/stop/sample/batch resources remain TBD.
 - APIs tolerate duplicate, delayed, and out-of-order samples and do not treat missing data as automatic user fault.
 - The server validates state, freshness, plausibility, retention, and current sharing authorization; client permission/service state never establishes workflow truth.
+- Unmatched journey origins/destinations/stops/routes are deleted within 24 hours after journey close/expiry. Transaction-associated planned routes and precise transaction-location evidence are retained for 30 days after closure, extended only by approved dispute/investigation/legal obligations or holds (`DECISIONS.md`, DEC-061).
+- Historical records reference immutable Kirim `geofence_version_id` values. Minimized post-deletion matching audit data excludes exact coordinates and reconstructable private route geometry.
 - Precise coordinates never appear in push payloads, problem details, ordinary logs, or disclosure-unsafe responses.
 
 ## 3. REST Operation Template
