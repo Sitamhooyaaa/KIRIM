@@ -5244,3 +5244,55 @@ Review after pilot recruitment/device survey, Flutter/plugin compatibility resul
 
 - `docs/TECH_STACK.md`
 - Flutter/Dart pin, Android manifest/Gradle, Play policy, device lab, and compatibility testing
+
+---
+
+## DEC-060 — 2026-10-18 — Use a Lean RM150 Stage A Target and RM300 Pilot Budget Ceiling
+
+- **Status:** Accepted
+- **Decision owner:** Product Owner
+
+### Context
+
+Kirim is a learning-oriented internal prototype followed by an invite-only pilot of at most 50 accounts. Early usage does not justify production-scale capacity, but cost reduction must not silently remove security, recoverability, or authoritative workflow controls. Several providers charge in USD or by usage, and managed database/identity minimums may dominate the small workload.
+
+### Decision
+
+- Target **RM150 per month** for Stage A infrastructure/provider operations, with a **hard planning ceiling of RM300 per month**.
+- Target **RM300 per month** for the initial Stage B pilot. Any forecast or actual sustained overrun requires Product Owner review and approval before increasing capacity or purchasing a paid tier.
+- This operating budget includes cloud runtime, database, storage, authentication, SMS/email verification, maps/routing usage, logs, monitoring, and ordinary taxes/currency effects on those services.
+- It excludes payment transaction/provider fees, professional legal/accounting/tax review, development labor, and one-time registration/domain/Play/business costs. Those require separate visibility and approval.
+
+**Controls**
+
+- Configure provider/GCP budget notifications at approximately 50%, 75%, 90%, and 100%, while recognizing alerts are not guaranteed hard spending caps.
+- Set explicit autoscaling, instance, quota, log-retention, SMS, maps, and provider usage limits appropriate to each environment.
+- Keep non-production resources off or scaled to zero when not needed. Stage A may run the Worker manually/on demand and does not require production HA if synthetic-data recovery remains straightforward.
+- Do not purchase paid Auth0, MUI, observability, maps, support, or other tiers without explicit approval and a documented need.
+- Use free allowances only where terms, reliability, deletion/export, security, and upgrade risk are acceptable; never make architecture correctness depend on an undocumented free tier.
+- Review costs weekly during active Stage A/Stage B operation and attribute material spend by environment/service.
+
+**Safety boundary**
+
+- Stage B cannot remove required backups/PITR, restore proof, security controls, audit, payment reconciliation, evidence protection, or incident/pilot-pause capability merely to meet RM300.
+- If mandatory Stage B controls or a provider's minimum compliant plan cannot fit, present measured options: reduce pilot scope/uptime, change provider/architecture, increase the approved budget, or delay/pause Stage B.
+
+### Rationale
+
+The targets are proportionate to a very small pilot and encourage disciplined managed-service use. Separate ceilings and exclusions prevent variable payment or professional-review costs from obscuring infrastructure spend while preserving explicit approval for overruns.
+
+### Alternatives Considered
+
+- **RM1,000/month initial budget:** Rejected as unnecessarily high before measured demand.
+- **Near-zero/free-only architecture:** Rejected because it could force unsafe storage, missing backups, unreliable workers, or unsuitable identity/payment choices.
+- **One hard technical spending cap:** Not selected because cloud alerts/caps can interrupt critical obligations and do not replace operational review.
+
+### Revisit Triggers
+
+Review when provider quotes are available, Stage B readiness is assessed, monthly usage approaches 75% of budget, exchange rates materially change, or required security/reliability controls cannot fit.
+
+### Affected Areas
+
+- `docs/TECH_STACK.md`
+- `docs/REQUIREMENTS.md`
+- Provider procurement, quotas, scaling, log retention, alerts, and Stage B approval

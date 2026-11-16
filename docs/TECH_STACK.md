@@ -236,7 +236,15 @@ See `DECISIONS.md`, DEC-041, DEC-044, DEC-048, DEC-052, DEC-053, and DEC-055.
 - Provide audited server-side pilot pause controls for intake, acceptance, payments, settlement/payout, evidence, messaging, and full-pilot suspension where safe.
 - Maintain release, rollback/forward-recovery, backup/restore, provider outage, payment reconciliation, security incident, and user communication runbooks.
 
-See `DECISIONS.md`, DEC-041, DEC-052, DEC-053, DEC-057, and DEC-058.
+**Cost controls**
+
+- Stage A targets RM150/month with an RM300/month planning ceiling; the initial Stage B pilot targets RM300/month (`DECISIONS.md`, DEC-060).
+- Configure budget alerts near 50%, 75%, 90%, and 100%, explicit autoscaling/quota/retention limits, and weekly active-pilot cost review.
+- Scale non-production resources down/off when safe; Stage A may use an on-demand Worker and no HA database.
+- Stage B does not remove required backup/PITR, restore, security, audit, evidence, payment reconciliation, or incident controls to meet budget. Escalate with measured options instead.
+- Payment fees, professional review, labor, and one-time registration/domain/Play/business costs are tracked separately.
+
+See `DECISIONS.md`, DEC-041, DEC-052, DEC-053, DEC-057, DEC-058, and DEC-060.
 
 ## 8. Architecture Decision Records
 
@@ -251,6 +259,6 @@ The architecture and recommended stack are complete for Product Owner review. Th
 - [ ] **Identity/SMS/email production approval:** Auth0, Twilio Verify, and Amazon SES are conditional selections pending plan/region/DPA, SDK, MFA/recovery, Malaysia delivery/compliance, sender-domain, event, and cost tests (`DECISIONS.md`, DEC-055).
 - [ ] **PostgreSQL job library:** Procrastinate remains the candidate, but its worker connector/execution model must be reconciled with the approved synchronous application database model and prove transactional enqueue/crash recovery (`DECISIONS.md`, DEC-010, DEC-021, and DEC-025).
 - [ ] **Exact dependency/tool versions:** lock only after the approved Windows/Linux, Python 3.14, Flutter/Gradle/Android, React/TypeScript/Vite, OpenAPI generation, Patrol, and provider SDK compatibility spikes.
-- [ ] **Stage B operational parameters:** connection/concurrency budgets, retention periods, RPO/RTO, alert thresholds, recent-auth window, session limits, quotas, support hours, and capped pilot budget require measured/configuration review.
+- [ ] **Stage B operational parameters:** connection/concurrency budgets, retention periods, RPO/RTO, operational alert thresholds, recent-auth window, session limits, quotas, and support hours require measured/configuration review. Budget targets are approved under DEC-060.
 
 A failed gate triggers comparison or an explicit requirement/decision change; contributors must not silently treat a candidate as production-approved.

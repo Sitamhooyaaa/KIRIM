@@ -174,7 +174,7 @@ Use this file as a reminder of the major decisions required to build Kirim with 
 
 ## Current Progress
 
-- Major accepted decision records: **59**.
+- Major accepted decision records: **60**.
 - `docs/TECH_STACK.md` is complete as a Product Owner review draft.
-- Remaining gates are evidence-driven rather than preference decisions: final maps vendor; production payment approval; production identity/SMS/email approval; PostgreSQL job library compatibility; exact locked versions and measured Stage B operating parameters.
+- Remaining gates are evidence-driven rather than preference decisions: final maps vendor; production payment approval; production identity/SMS/email approval; PostgreSQL job library compatibility; exact locked versions and measured Stage B operating parameters. Stage A/Stage B budget targets are approved under DEC-060.
 - Current next step: **Product Owner review of the completed technical-stack draft and gated selections**.
