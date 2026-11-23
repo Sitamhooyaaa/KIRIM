@@ -6,7 +6,7 @@
 
 ## 1. Purpose
 
-Kirim needs a stable internal model for Customer funding, Shopper reimbursement, Shopper earnings, refunds, disputes, and settlement. That model must remain understandable even if the eventual provider uses different words or objects.
+Kirim needs a stable internal model for Customer funding, Shopper reimbursement, Shopper earnings, refunds, disputes, and settlement. That model must remain understandable even if the eventual provider uses different words or objects. The surrounding request, fulfilment, delivery, cancellation, dispute, and closure lifecycle is proposed in `docs/TRANSACTION_STATE_MACHINE.md`.
 
 The model separates four concerns:
 

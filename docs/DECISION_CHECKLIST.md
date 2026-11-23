@@ -137,7 +137,7 @@ Use this file as a reminder of the major decisions required to build Kirim with 
 ## J. Design Decisions After `TECH_STACK.md`
 
 - [ ] Database entities, ownership, constraints, indexes, and retention.
-- [ ] Complete transaction state machine.
+- [ ] Complete transaction state machine — review draft created in `docs/TRANSACTION_STATE_MACHINE.md`; five Product Owner lifecycle questions and engineering validation remain open.
 - [ ] Financial ledger and reconciliation model — Product Owner product rules accepted under DEC-062 in `docs/PAYMENT_DOMAIN_MODEL.md`; provider evidence, Malaysian accounting/legal validation, and schema/API review remain open.
 - [ ] API resources, request/response schemas, and error codes.
 - [ ] Evidence/file metadata and access model.

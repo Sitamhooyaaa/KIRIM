@@ -63,6 +63,13 @@ The example hostname and resource paths are placeholders, not approved endpoint 
 - Retry guidance: Retry only documented safe/idempotent operations and preserve the same idempotency key for the same intended operation.
 - Concurrency control: Strong ETag/`If-Match` for eligible editable resources; transactional state checks, locking/versioning, uniqueness, and constraints for workflow actions. Use `412` for failed explicit preconditions and `409` for current domain-state conflicts.
 
+### Transaction Workflow Boundary
+
+- Public workflow resources/actions must map to the reviewed lifecycle and guards in `docs/TRANSACTION_STATE_MACHINE.md`; clients cannot submit arbitrary status values or bypass explicit action commands.
+- Request/negotiation state, fulfilment phase, payment state, dispute/support state, and holds remain distinct authoritative regions. API presentation statuses may combine them but must expose stable machine codes.
+- All timers use server-persisted absolute deadlines. Client countdowns and push notifications are informational only.
+- Exact transaction actions, state enums, version/ETag behavior, and problem codes remain unapproved until the Product Owner resolves the state-machine review items.
+
 ### Payment Domain Boundary
 
 - Public payment contracts expose Kirim-normalized funding, refund, dispute-block, reconciliation, and settlement states rather than provider-specific object status names (`docs/PAYMENT_DOMAIN_MODEL.md`).
