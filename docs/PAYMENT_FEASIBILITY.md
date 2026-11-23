@@ -16,6 +16,8 @@ The decision must end in one of three outcomes:
 
 Silence, marketing material, a successful happy-path sandbox payment, or the ability to configure an API call is not provider approval.
 
+The provider-neutral Product Owner rules in `docs/PAYMENT_DOMAIN_MODEL.md` Section 20 are accepted under DEC-062. Provider, legal, accounting, and technical feasibility gates remain open.
+
 ## 2. Kirim Payment Model to Validate
 
 The evaluation must use the actual Kirim workflow, not a generic marketplace example:

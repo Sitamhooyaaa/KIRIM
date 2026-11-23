@@ -1,6 +1,6 @@
 # Provider-Neutral Payment Domain Model
 
-> Status: Draft for Product Owner, provider, legal, accounting, and engineering review.
+> Status: Product Owner product rules accepted under DEC-062; provider, legal, accounting, schema/API, and engineering validation remain open.
 >
 > This document proposes Kirim's internal payment language and controls without approving Stripe or another provider. `docs/REQUIREMENTS.md` and accepted records in `DECISIONS.md` remain authoritative. Items marked **OPEN** or **GATE** are not implementation decisions.
 
@@ -388,7 +388,7 @@ earnings component       = locked Shopper fee or authorized compensation
 total settlement         = reimbursement + earnings
 ```
 
-**Proposed recommendation for review:** issue one provider transfer when supported, while preserving two internal components and two statement lines. This reduces provider operations without confusing reimbursement and earnings.
+**APPROVED-PO-PAY-002:** preserve reimbursement and earnings as separate internal and user-statement components, while allowing one provider transfer for their total when supported. This reduces provider operations without confusing reimbursement and earnings.
 
 ## 10. Proposed Immutable Financial Journal
 
@@ -501,7 +501,7 @@ Shopper compensation: 50% of locked fee
 Customer refund: remaining locked fee principal
 ```
 
-**OPEN-PO-PAY-001:** define deterministic sen rounding when 50% produces a half-sen. Recommendation: round Shopper compensation down to whole sen and return the remainder to the Customer, subject to legal/accounting review.
+**APPROVED-PO-PAY-001:** calculate 50% in integer sen, round the Shopper compensation down to the nearest whole sen, and return the remainder to the Customer. Provider/legal/accounting review may still require a stricter treatment but cannot silently make the Customer receive less.
 
 The journal records the refund obligation and Shopper earnings obligation separately. Provider fees are handled only according to approved provider/legal rules.
 
@@ -763,13 +763,13 @@ These are genuine product choices or confirmations. They are not silently approv
 
 | ID | Question | Recommendation | Why it matters |
 |---|---|---|---|
-| OPEN-PO-PAY-001 | How should half-sen cancellation compensation round? | Round Shopper compensation down to whole sen; return remainder to Customer | Deterministic and Customer-favoring |
-| OPEN-PO-PAY-002 | Should reimbursement and earnings appear separately even if provider uses one transfer? | Yes | Clear tax/support/user explanation |
-| OPEN-PO-PAY-003 | When may the app tell the Shopper “paid”? | Use “transferred” after connected-account transfer; “paid to bank” only after observable payout confirmation | Avoid misleading status |
-| OPEN-PO-PAY-004 | How long does the Customer have to complete the initial Shopper-fee payment after final confirmation? | Propose 10 minutes to match negotiation/balance urgency, but confirm through user-flow review | Requirements currently specify 10 minutes only for balance funding |
-| OPEN-PO-PAY-005 | Must a Shopper finish provider onboarding before publishing a journey, accepting a request, or only before settlement? | Recommend before accepting a request | Avoid completing work for an account unable to receive funds |
-| OPEN-PO-PAY-006 | What financial remedy may a late delivery dispute request after settlement? | Always manual Support review; no promise of automatic reversal | Provider transfer/payout may be irreversible |
-| OPEN-PO-PAY-007 | Should one failed balance attempt allow another attempt within the same 10-minute window? | Yes, if the prior result is definitively failed and no uncertainty exists | Improves recovery without duplicate risk |
+| APPROVED-PO-PAY-001 | **Accepted:** round Shopper compensation down to whole sen and return the remainder to the Customer | Product Owner approved | Deterministic and Customer-favoring |
+| APPROVED-PO-PAY-002 | **Accepted:** show reimbursement and earnings separately even when one provider transfer carries the total | Product Owner approved | Clear tax/support/user explanation |
+| APPROVED-PO-PAY-003 | **Accepted:** display settlement processing, provider-account transfer, bank-payout pending, and bank-payout confirmation separately; use “paid to bank” only after provider confirmation | Product Owner approved | Avoid misleading status |
+| APPROVED-PO-PAY-004 | **Accepted:** Customer has 10 minutes after final confirmation to complete the initial Shopper-fee payment; uncertain results enter verification rather than automatic failure | Product Owner approved | Consistent urgency without allowing an unpaid transaction to reserve the Shopper indefinitely |
+| APPROVED-PO-PAY-005 | **Accepted:** payout onboarding/capability is required before the Shopper accepts or counters a request; recheck before checkout and settlement | Product Owner approved | Allows exploration without creating obligations to an account unable to receive funds |
+| APPROVED-PO-PAY-006 | **Accepted:** late delivery disputes enter manual Support review with no automatic reversal or guaranteed refund; authorized compensating action remains possible where evidence, rights, and provider capability permit | Product Owner approved | Provider transfer/payout may already be irreversible; safety/fraud reports still require review |
+| APPROVED-PO-PAY-007 | **Accepted:** allow another balance-payment attempt within the original 10-minute deadline only after definitive failure/cancellation; do not restart the deadline and reconcile uncertain attempts first | Product Owner approved | Improves recovery without duplicate or indefinite-wait risk |
 
 ## 21. Provider and Professional Gates
 
@@ -846,7 +846,7 @@ Other modules request named payment capabilities through application services. T
 
 ## 24. Review and Approval Sequence
 
-1. Product Owner reviews Section 20 choices.
+1. Product Owner Section 20 choices are accepted and recorded in DEC-062.
 2. Engineering reviews state/invariant completeness and builds executable fake-provider tests.
 3. Database/API designs map this model into schemas/contracts without provider leakage.
 4. Stripe/provider evidence resolves Section 21 technical gates.

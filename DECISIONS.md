@@ -5360,3 +5360,56 @@ Review if provider terms prohibit the required temporary use, disputes demonstra
 - `docs/API_CONTRACTS.md`
 - `docs/DATABASE_SCHEMA.md`
 - Journey, matching, transaction-location, geofence, retention, deletion, hold, export, and audit jobs
+
+---
+
+## DEC-062 — 2026-10-18 — Approve Provider-Neutral MVP Payment Product Rules
+
+- **Status:** Accepted
+- **Decision owner:** Product Owner
+
+### Context
+
+`docs/PAYMENT_DOMAIN_MODEL.md` identified seven product-facing ambiguities that must be stable before engineering can turn the provider-neutral model into schemas, APIs, and executable fake-provider tests. These choices do not approve Stripe, settle legal/accounting classification, or define provider-specific objects.
+
+### Decision
+
+1. **Cancellation rounding:** Calculate 50% compensation in integer sen, round the Shopper amount down to the nearest whole sen, and return the remainder to the Customer. Provider/legal/accounting review cannot silently reduce the Customer's approved remainder.
+2. **Settlement presentation:** Keep verified item-cost reimbursement and Shopper earnings as separate internal ledger and user-statement components, even when one approved provider transfer carries their combined total.
+3. **Payment wording:** Display settlement processing, transfer to the provider-side payout account, bank payout pending, and confirmed bank payout separately. Say “paid to bank” only after provider evidence supports it.
+4. **Initial-payment deadline:** Give the Customer 10 minutes after final confirmation to complete the initial Shopper-fee payment. An uncertain result enters verification/reconciliation rather than automatic failure or duplicate retry.
+5. **Shopper payout onboarding:** Permit exploration and journey publication before payout onboarding, but require completed/currently eligible payout onboarding before the Shopper accepts or counters a request. Recheck capability before checkout and settlement.
+6. **Late delivery disputes:** Route disputes submitted after the normal 24-hour window to manual Support review. They do not automatically reopen/reverse completed settlement or guarantee a refund; an authorized compensating action remains possible where evidence, legal rights, and provider capability permit.
+7. **Balance-payment retries:** Permit another attempt within the original 10-minute balance deadline only after the prior attempt definitively failed or was canceled. Do not restart the deadline, and reconcile uncertain attempts before permitting another.
+
+These rules are provider-neutral. A provider or professional-review failure triggers an explicit requirement/decision review rather than silent implementation drift.
+
+### Rationale
+
+- Customer-favoring deterministic rounding avoids half-sen ambiguity.
+- Separating reimbursement from earnings preserves support, tax, and audit meaning without forcing multiple transfer fees.
+- Accurate transfer/payout wording avoids claiming that money reached a bank prematurely.
+- Bounded deadlines protect the Shopper's single active slot while uncertainty handling prevents duplicate charges.
+- Payout readiness before commitment avoids asking a Shopper to work when Kirim cannot currently pay them.
+- Manual late-dispute review preserves safety/fraud escalation without promising reversal of irreversible funds.
+
+### Alternatives Considered
+
+- Round the half-sen to the Shopper; combine reimbursement/earnings into one opaque amount; call a connected-account transfer “paid”; leave initial funding open indefinitely; delay onboarding until settlement; reject all late reports; treat late reports as timely automatic disputes; allow only one balance attempt; or restart the deadline on every retry. These were rejected for fairness, clarity, recoverability, or abuse/financial-risk reasons.
+
+### Consequences
+
+- Requirements and client copy must reflect the approved distinctions and deadlines.
+- Payment schemas and tests need separate component amounts, transfer/payout status, capability checks, uncertainty handling, and immutable deadline data.
+- Provider/legal/accounting gates remain mandatory and may require an explicit superseding decision.
+
+### Revisit Triggers
+
+Review if usability tests show the deadlines are impractical, provider payment methods cannot fit the timing model, Malaysian advice requires different rounding/wording/onboarding, or late-dispute incidents demonstrate a safer bounded policy.
+
+### Affected Areas
+
+- `docs/REQUIREMENTS.md`
+- `docs/PAYMENT_DOMAIN_MODEL.md`
+- `docs/PAYMENT_FEASIBILITY.md`
+- Payment state machine, ledger, API contracts, UI copy, onboarding, cancellation, disputes, settlement, and tests

@@ -157,7 +157,7 @@ A Shopper may:
 
 - Publish and close journeys.
 - Review compatible requests.
-- Accept, reject, or make one counteroffer.
+- Accept, reject, or make one counteroffer. Accepting or countering requires completed, currently eligible payout onboarding; eligibility is rechecked before checkout and settlement.
 - Record prices and unavailable products.
 - Request substitution or price-change approval.
 - Upload purchase evidence and update fulfilment/delivery status.
@@ -324,8 +324,9 @@ Kirim may reject or remove a request that violates this policy. Product-policy e
 
 - The held initial payment equals the locked Shopper fee. Any payment-processing cost charged at that stage is disclosed separately and is not treated as Shopper funds.
 - The Shopper cannot begin the recorded price-collection stage until the payment provider confirms that the required funds are secured.
+- The Customer has 10 minutes after final confirmation to complete the initial Shopper-fee payment.
 - Initial-payment retries are idempotent and cannot create duplicate charges.
-- A failed or abandoned payment leaves the transaction unapproved for price collection and provides a safe retry or cancellation path.
+- A failed or abandoned payment leaves the transaction unapproved for price collection and provides a safe retry or cancellation path. An uncertain result enters provider verification/reconciliation rather than being treated automatically as failure at the deadline.
 
 **Priority:** Must
 
@@ -394,6 +395,7 @@ Kirim may reject or remove a request that violates this policy. Product-policy e
 - Kirim does not release a duplicate reimbursement or payout when an operation is retried.
 - A material discrepancy or open dispute blocks any affected automatic release until an authorized outcome is recorded.
 - Every reimbursement, earning, refund, or release is linked to the transaction and auditable.
+- Shopper-facing status distinguishes settlement processing, transfer to the provider-side payout account, bank payout pending, and confirmed bank payout; Kirim says “paid to bank” only when supported by provider confirmation.
 
 **Priority:** Must
 
@@ -598,7 +600,7 @@ All requirements below are proposed for the MVP and remain subject to final appr
 | FR-REQ-003 | Kirim shall enforce the approved allowed/prohibited-product policy. | Must | Prohibited or payment-provider-restricted products are rejected or routed for review. | Proposed |
 | FR-REQ-004 | Kirim shall capture item, quantity, budget, substitution, shop, delivery, and fee-offer details. | Must | Incomplete or invalid requests cannot enter negotiation. | Proposed |
 | FR-NEG-001 | Kirim shall suggest RM5 for up to three distinct item lines plus RM1 per additional distinct item line. | Must | The suggestion is calculated consistently and remains configurable. | Proposed |
-| FR-NEG-002 | Kirim shall allow a Customer initial offer and exactly one Shopper response: accept, reject, or counter. | Must | A second counteroffer is rejected. | Proposed |
+| FR-NEG-002 | Kirim shall allow a Customer initial offer and exactly one Shopper response: accept, reject, or counter. | Must | A second counteroffer is rejected. Accept/counter is unavailable until the Shopper's payout onboarding is complete and currently eligible. | Proposed |
 | FR-NEG-003 | Kirim shall expire each required negotiation response after 10 minutes. | Must | Expired offers cannot be accepted without a new valid request/offer. | Proposed |
 | FR-NEG-004 | Kirim shall form a transaction only after explicit Customer final confirmation. | Must | Confirmation locks terms and reserves the Shopper's active slot atomically. | Proposed |
 
@@ -609,10 +611,10 @@ All requirements below are proposed for the MVP and remain subject to final appr
 | FR-PAY-001 | Kirim shall calculate the held initial payment as the locked Shopper fee and disclose any associated processing cost separately. | Must | Processing cost is Customer-paid but is not treated as held Shopper funds; no Kirim platform fee is included. | Proposed |
 | FR-PAY-002 | Kirim shall rely on confirmed payment-provider state before allowing price collection or checkout. | Must | Client-side success alone cannot advance the transaction. | Proposed |
 | FR-PAY-003 | Kirim shall produce an itemized invoice with approved items, fees, all amounts already paid, and outstanding balance. | Must | Totals reconcile; the held initial payment and previously paid processing costs are each credited exactly once. | Proposed |
-| FR-PAY-004 | Kirim shall give the Customer 10 minutes to secure the outstanding balance. | Must | Expiry invokes the approved cancellation-compensation rule. | Proposed |
+| FR-PAY-004 | Kirim shall give the Customer 10 minutes to secure the outstanding balance. | Must | Expiry invokes the approved cancellation-compensation rule. Another attempt is allowed within the original deadline only after definitive failure/cancellation; the deadline does not restart, and an uncertain attempt must be reconciled first. | Proposed |
 | FR-PAY-005 | Kirim shall make charge, refund, reimbursement, and payout operations idempotent. | Must | Retried operations cannot duplicate financial effects. | Proposed |
 | FR-PAY-006 | Kirim shall represent held, failed, refunded, disputed, reimbursed, and released payment states distinctly. | Must | Users and support cannot mistake a pending/held amount for a final payout or refund. | Proposed |
-| FR-PAY-007 | Kirim shall make normal Shopper settlement eligible 24 hours after confirmed delivery when no dispute is open. | Must | The deadline/dispute check and settlement reservation are atomic; open or timely disputes block affected release; the Shopper sees the expected timing. | Proposed |
+| FR-PAY-007 | Kirim shall make normal Shopper settlement eligible 24 hours after confirmed delivery when no dispute is open. | Must | The deadline/dispute check and settlement reservation are atomic; open or timely disputes block affected release; the Shopper sees the expected timing. Reimbursement and earnings remain separately itemized even if one provider transfer carries their total. | Proposed |
 | FR-SHP-001 | Kirim shall let the Shopper record each item's quantity, availability, and actual price. | Must | Each value is attributable to the Shopper and transaction. | Proposed |
 | FR-SHP-002 | Kirim shall require Customer approval within 5 minutes for substitutions or prices outside pre-approved limits. | Must | Rejection or expiry skips the affected item. | Proposed |
 | FR-SHP-003 | Kirim shall block purchase authorization until all required Customer funds are confirmed as secured. | Must | A Shopper is never instructed to purchase from a pending or failed payment state. | Proposed |
@@ -629,8 +631,8 @@ All requirements below are proposed for the MVP and remain subject to final appr
 | FR-DEL-003 | Kirim shall require approved in-app handover confirmation for successful delivery. | Must | Missing confirmation cannot be represented as successful without authorized support resolution. | Proposed |
 | FR-DEL-004 | Kirim shall implement the 10-minute failed-delivery procedure. | Must | In-app contact, waiting period, and arrival evidence precede `delivery_failed`. | Proposed |
 | FR-CAN-001 | Kirim shall calculate cancellation outcomes from the verified transaction state and responsible party. | Must | Outcomes match Section 9 and are shown before cancellation confirmation. | Proposed |
-| FR-CAN-002 | Kirim shall pay 50% of the locked Shopper fee after qualifying verified price collection when the Customer cancels or balance payment expires. | Must | At least one valid price with required location/time evidence exists; suspicious evidence enters review. | Proposed |
-| FR-DSP-001 | Kirim shall allow either party to dispute delivery or failed delivery within 24 hours. | Must | Late submissions are handled according to a documented support exception rather than silently accepted as timely. | Proposed |
+| FR-CAN-002 | Kirim shall pay 50% of the locked Shopper fee after qualifying verified price collection when the Customer cancels or balance payment expires. | Must | At least one valid price with required location/time evidence exists; suspicious evidence enters review. Calculate in integer sen; round the Shopper amount down and return any remainder to the Customer. | Proposed |
+| FR-DSP-001 | Kirim shall allow either party to dispute delivery or failed delivery within 24 hours. | Must | Late submissions enter manual Support review and do not automatically reopen or reverse completed settlement or guarantee a refund; authorized compensating action remains possible where evidence, legal rights, and provider capability permit. | Proposed |
 | FR-DSP-002 | Kirim shall block affected automatic settlement while a dispute is open. | Must | Funds remain held where supported until an authorized outcome. | Proposed |
 | FR-DSP-003 | Kirim shall require human authorization for consequential MVP dispute outcomes. | Must | The system may organize evidence but cannot autonomously decide refunds, payouts, or fault. | Proposed |
 

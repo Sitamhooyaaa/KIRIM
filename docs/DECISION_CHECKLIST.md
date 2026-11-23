@@ -138,7 +138,7 @@ Use this file as a reminder of the major decisions required to build Kirim with 
 
 - [ ] Database entities, ownership, constraints, indexes, and retention.
 - [ ] Complete transaction state machine.
-- [ ] Financial ledger and reconciliation model — provider-neutral review draft created in `docs/PAYMENT_DOMAIN_MODEL.md`; Product Owner choices, provider evidence, and Malaysian accounting/legal validation remain open.
+- [ ] Financial ledger and reconciliation model — Product Owner product rules accepted under DEC-062 in `docs/PAYMENT_DOMAIN_MODEL.md`; provider evidence, Malaysian accounting/legal validation, and schema/API review remain open.
 - [ ] API resources, request/response schemas, and error codes.
 - [ ] Evidence/file metadata and access model.
 - [ ] Geofence and route-geometry schema.
@@ -174,7 +174,7 @@ Use this file as a reminder of the major decisions required to build Kirim with 
 
 ## Current Progress
 
-- Major accepted decision records: **61**.
+- Major accepted decision records: **62**.
 - `docs/TECH_STACK.md` is complete as a Product Owner review draft.
 - Remaining gates are evidence-driven rather than preference decisions: final maps vendor; production payment approval; production identity/SMS/email approval; PostgreSQL job library compatibility; exact locked versions and measured Stage B operating parameters. Stage A/Stage B budget targets are approved under DEC-060.
 - Current next step: **Product Owner review of the completed technical-stack draft and gated selections**.
