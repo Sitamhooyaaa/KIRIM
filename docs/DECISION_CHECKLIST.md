@@ -93,7 +93,7 @@ Use this file as a reminder of the major decisions required to build Kirim with 
 
 ## G. External Providers
 
-- [ ] **DEC-057 gated:** Stripe Connect Malaysia is the leading candidate; execute `docs/PAYMENT_FEASIBILITY.md` and obtain exact funds-flow, liability, legal/tax/accounting, sandbox, and 24-hour settlement proof before production approval.
+- [ ] **DEC-057 gated:** Stripe Connect Malaysia is the leading candidate; review `docs/PAYMENT_DOMAIN_MODEL.md`, execute `docs/PAYMENT_FEASIBILITY.md`, and obtain exact funds-flow, liability, legal/tax/accounting, sandbox, and 24-hour settlement proof before production approval.
 - [ ] **DEC-057 gated:** Complete the payment plan's signed-webhook, idempotency, ledger, reconciliation, refund/reversal/payout, fake-provider, sandbox, outage, and pilot-pause evidence register before Stage B.
 - [ ] **DEC-034 / DEC-056 / DEC-061 gated:** Split-capable maps architecture and minimized route-retention policy accepted; final vendor must permit server matching/corridor derivation and the approved temporary retention, with KL quality, privacy, SDK, cost, and contract proof.
 - [x] **DEC-037 / DEC-056:** Direct Firebase Cloud Messaging with minimal hints and server catch-up.
@@ -138,7 +138,7 @@ Use this file as a reminder of the major decisions required to build Kirim with 
 
 - [ ] Database entities, ownership, constraints, indexes, and retention.
 - [ ] Complete transaction state machine.
-- [ ] Financial ledger and reconciliation model.
+- [ ] Financial ledger and reconciliation model — provider-neutral review draft created in `docs/PAYMENT_DOMAIN_MODEL.md`; Product Owner choices, provider evidence, and Malaysian accounting/legal validation remain open.
 - [ ] API resources, request/response schemas, and error codes.
 - [ ] Evidence/file metadata and access model.
 - [ ] Geofence and route-geometry schema.

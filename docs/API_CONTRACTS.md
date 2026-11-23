@@ -63,6 +63,14 @@ The example hostname and resource paths are placeholders, not approved endpoint 
 - Retry guidance: Retry only documented safe/idempotent operations and preserve the same idempotency key for the same intended operation.
 - Concurrency control: Strong ETag/`If-Match` for eligible editable resources; transactional state checks, locking/versioning, uniqueness, and constraints for workflow actions. Use `412` for failed explicit preconditions and `409` for current domain-state conflicts.
 
+### Payment Domain Boundary
+
+- Public payment contracts expose Kirim-normalized funding, refund, dispute-block, reconciliation, and settlement states rather than provider-specific object status names (`docs/PAYMENT_DOMAIN_MODEL.md`).
+- A client redirect, callback, local SDK result, screenshot, or push notification never establishes financial success. Only verified backend/provider evidence may advance the authoritative state.
+- Consequential funding, refund, and settlement operations use client idempotency keys plus server semantic-operation uniqueness. Unknown provider outcomes remain pending/uncertain until lookup or reconciliation resolves them.
+- Reimbursement and Shopper earnings remain separate response/ledger components even if the approved provider later executes one transfer.
+- Exact payment resources, status enums, action subresources, problem codes, and webhook schemas remain unapproved until the Product Owner reviews the domain-model open items and provider/professional gates close.
+
 ### Evidence File Transfer
 
 - Upload and download bytes through authenticated, currently authorized backend endpoints; clients do not connect directly to production object storage (`DECISIONS.md`, DEC-026).

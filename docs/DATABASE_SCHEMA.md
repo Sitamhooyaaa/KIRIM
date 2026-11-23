@@ -12,6 +12,7 @@
 - Design migrations to be reversible or provide a tested recovery procedure.
 - Use EPSG:4326 with explicit PostGIS geometry/geography types; never perform authoritative distance or containment using untyped latitude/longitude arithmetic (`DECISIONS.md`, DEC-028).
 - Model unmatched journey route deletion within 24 hours after close/expiry, transaction-associated planned-route/location deletion 30 days after closure unless held, immutable historical geofence versions, and minimized non-spatial matching audit as distinct lifecycle concerns (`DECISIONS.md`, DEC-061).
+- Design payment obligations, attempts, provider events, reconciliation exceptions, and append-only balanced journal/posting records from the reviewed provider-neutral proposal in `docs/PAYMENT_DOMAIN_MODEL.md`; do not persist a Stripe-shaped domain schema before provider and professional gates close.
 
 ## 2. Data Classification and Lifecycle
 

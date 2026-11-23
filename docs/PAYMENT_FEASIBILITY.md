@@ -306,7 +306,7 @@ This action is complete when the Product Owner has written advice covering the i
 
 ## 7. Engineering Sandbox and Failure-Recovery Plan
 
-This work supports the owner actions; it does not replace provider or professional approval.
+This work supports the owner actions; it does not replace provider or professional approval. The proposed provider-neutral states, journal, interfaces, and open Product Owner questions are documented in `docs/PAYMENT_DOMAIN_MODEL.md`.
 
 ### 7.1 Build order
 
@@ -425,7 +425,7 @@ Maintain this table without secrets or unnecessary personal data:
 | 1 | Confirm whether a suitable Malaysian legal entity/business account exists for provider onboarding | Product Owner | Recorded prerequisite or blocker |
 | 2 | Create and secure the Stripe Malaysia test account | Product Owner | PAY-EV-001 |
 | 3 | Submit the Section 5 provider brief/questions | Product Owner, prepared with Engineering Lead | PAY-EV-002 and PAY-EV-003 |
-| 4 | Draft provider-neutral money-flow state diagram and fake-provider contract | Engineering Lead | Technical spike specification |
+| 4 | Review and refine `docs/PAYMENT_DOMAIN_MODEL.md`, then turn its states/interfaces into executable fake-provider tests | Engineering Lead / Product Owner | Reviewed domain model and technical spike specification |
 | 5 | Shortlist Malaysian legal and accounting/tax advisers and request scoped quotations | Product Owner | Adviser comparison and expected one-time cost |
 | 6 | Run fake-provider tests while awaiting Stripe answers | Engineering Lead | PAY-EV-004 |
 | 7 | Map confirmed Stripe model and run sandbox tests | Engineering Lead | PAY-EV-005 |
